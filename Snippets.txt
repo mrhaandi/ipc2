@@ -1,0 +1,4 @@
+Profiling:
+Set Ltac Profiling.
+tactic
+Show Ltac Profile.
