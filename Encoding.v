@@ -141,6 +141,83 @@ Ltac decompose_lc :=
     end
   end).
 
+Lemma inspect_chain_diophantines_aux_one : forall (m : nat) (params : list formula) (ds : list diophantine), 
+  lc m (represent_diophantines ds) ->
+  chain (quantify_formula m (arr (arr triangle triangle) (represent_diophantines ds))) (get_label triangle) params -> 
+  exists (f : nat -> formula), 
+  tail params = flat_map (represent_diophantine_repr f) ds /\ (forall (x : nat), m <= x -> f x = one).
+Proof.
+(*no more induction on n*)
+intros.
+gimme chain; simpl; inversion.
+gimme contains. simpl.
+
+move /quantified_arrow_not_contains_atom => //.
+
+gimme contains; move /contains_to_prenex_instantiation.
+gimme lc => H_lc.
+move /(_ H_lc) => [f [? [H_f H_f2]]].
+
+exists (fun n => match f n with | Some u => u | _ => one end); simpl.
+split.
+
+revert dependent ts.
+revert dependent u.
+revert dependent ds.
+elim.
+(*no equations*)
+simpl.
+intros; subst.
+gimme chain; inversion; auto.
+gimme contains; inversion.
+(*at least one equation*)
+
+
+case.
+{
+move => x.
+simpl. intros until 0 => IH; intros; subst.
+decompose_chain.
+decompose_lc.
+compute.
+have : exists u, f x = Some u ∧ lc 0 u by auto.
+move => [? [-> ?]].
+do ? f_equal.
+apply : IH => //.
+}
+
+{
+move => x y z.
+simpl. intros until 0 => IH; intros; subst.
+decompose_chain.
+decompose_lc.
+compute.
+have : exists ux, f x = Some ux ∧ lc 0 ux by auto.
+have : exists uy, f y = Some uy ∧ lc 0 uy by auto.
+have : exists uz, f z = Some uz ∧ lc 0 uz by auto.
+move => [? [-> ?]] [? [-> ?]] [? [-> ?]].
+do ? f_equal.
+apply : IH => //.
+}
+
+{
+move => x y z.
+simpl. intros until 0 => IH; intros; subst.
+decompose_chain.
+decompose_lc.
+compute.
+have : exists ux, f x = Some ux ∧ lc 0 ux by auto.
+have : exists uy, f y = Some uy ∧ lc 0 uy by auto.
+have : exists uz, f z = Some uz ∧ lc 0 uz by auto.
+move => [? [-> ?]] [? [-> ?]] [? [-> ?]].
+do ? f_equal.
+apply : IH => //.
+}
+
+move => x Hx.
+have : f x = None by auto.
+by move => ->.
+Qed.
 
 Lemma inspect_chain_diophantines_aux : forall (m : nat) (params : list formula) (ds : list diophantine), 
   lc m (represent_diophantines ds) ->
@@ -224,6 +301,13 @@ Proof.
 eauto using inspect_chain_diophantines_aux, lc_represent_diophantines.
 Qed.
 
+Lemma inspect_chain_diophantines_one : forall (params : list formula) (ds : list diophantine), 
+  chain (s_x_d ds) (get_label triangle) params -> 
+  exists (f : nat -> formula), 
+  tail params = flat_map (represent_diophantine_repr f) ds /\ (forall (x : nat), diophantine_variable_bound ds <= x -> f x = one).
+Proof.
+eauto using inspect_chain_diophantines_aux_one, lc_represent_diophantines.
+Qed.
 
 (*HintDb containing instantiation simplification rules*)
 Create HintDb simplify_formula.

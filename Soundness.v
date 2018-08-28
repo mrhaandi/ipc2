@@ -407,6 +407,22 @@ intros.
 apply : interpretation_soundness; eassumption.
 Qed.
 
+Fixpoint dio_variables (d : diophantine) :=
+  match d with
+  | (dio_one x) => [x]
+  | (dio_sum x y z) => [x; y; z]
+  | (dio_prod x y z) => [x; y; z]
+  end.
+
+Definition dio_in (x : nat) (ds : list diophantine) := In x (flat_map dio_variables ds).
+
+(*
+Inductive dio_in (x : nat) : diophantine -> Prop :=
+  | dio_in_one : dio_in x (dio_one x)
+  | dio_in_sum : forall (x' y' z' : nat), x = x' \/ x = y' \/ x = z' -> dio_in x (dio_sum x' y' z')
+  | dio_in_prod : forall (x' y' z' : nat), x = x' \/ x = y' \/ x = z' -> dio_in x (dio_prod x' y' z').
+*)
+
 
 Theorem soundness : forall (n : nat) (ΓU ΓS ΓP : list formula), 
   (forall {s : formula}, In s ΓU -> represents_nat s) ->
@@ -512,8 +528,94 @@ subst.
 gimme chain.
 move /inspect_chain_diophantines => [f H_f].
 constructor.
+have : ∃ g : nat → nat, Forall (λ d : diophantine, Diophantine.eval g d = true) ds /\ (forall (x : nat), dio_in x ds -> interpretation (f x) (1 + g x)).
+
+have : exists ds', Forall (normal_derivation (Nat.pred n) (ΓI ds' ++ ΓU ++ ΓS ++ ΓP)) params by eexists; eassumption.
+clear H1.
+move => [ds' H1].
+gimme Forall => HD.
+apply Forall_tl in HD.
+rewrite H_f in HD.
+clear H_f.
+revert dependent ds.
+elim.
+intros. exists (fun _ => 0).
+cbn. 
+intuition.
+case.
+move => x ds {IH} IH.
+cbn.
+intros.
+decompose_Forall.
+do ? decompose_USP.
+have := (IH ltac:(assumption)).
+move => [g [Hg1 Hg2]].
+match goal with [ _ : interpretation (f x) ?m |- _] => rename m into m1 end.
+set g' := fun x' => if x' =? x then Nat.pred m1 else g x'.
+exists g'.
+split.
+constructor.
+cbn.
+subst g'. cbn. inspect_eqb. inspect_eqb. auto.
+admit. (*can be showh, but tedious*)
+move => x'.
+case.
+intro. subst. subst g'. cbn. inspect_eqb. have : (Datatypes.S (Nat.pred m1)) = m1 by omega. move => ->. assumption.
+move => Hx'.
+move /(_ x' Hx') : Hg2.
+subst g'. cbn.
+(*preservation of interpretation*)
+case : (Nat.eq_dec x' x).
+move => ?. subst. inspect_eqb.
+move /(interpretation_soundness).
+move /(_ _ ltac:(eassumption)). intros. subst. assumption.
+intro. inspect_eqb. auto.
+(*can be shown*)
+
+eapply Forall_flat_map in HD; try eassumption.
+case : d HD H_d; cbn; intros.
+
+
+
+have 
+have : Forall (normal_derivation (Nat.pred n) (ΓI ds ++ ΓU ++ ΓS ++ ΓP)) params
+
+have : exists (g : nat -> nat), forall (x : nat), dio_in x ds -> interpretation (f x) (1+ g x).
+clear H2.
+have ? : Forall (normal_derivation (Nat.pred n) (triangle :: ΓU ++ ΓS ++ ΓP)) (flat_map (represent_diophantine_repr f) ds) by admit.
+clear H1 H_f.
+
+(*move Heq : (ds) => ds'.
+have : forall (d : diophantine), In d ds' -> In d ds by subst; auto.
+clear Heq.*)
+revert dependent ds.
+
+elim.
+
+cbn.
+intros.
+exists (fun _ => 0).
+done.
+case.
+move => x ds {IH} IH .
+cbn.
+intros.
+decompose_Forall.
+have := (IH H2).
+move => [g Hg].
+decompose_USP.
+exists (fun x' => if x' =? x then )
+cbn.
+intros.
+apply : IH; auto.
+
+admit.
+move => [g Hg].
+exists g.
+
+
 (*rewrite flat_map_concat_map in H_f.*)
-exists (fun x => epsilon (inhabits 0) (fun m => interpretation (f x) (1+m))).
+(*exists (fun x => epsilon (inhabits 0) (fun m => interpretation (f x) (1+m))).*)
 apply Forall_forall.
 
 move => d H_d.
@@ -525,9 +627,21 @@ case : d HD H_d; cbn; intros.
 
 1-3 : decompose_Forall.
 1-3 : do ? decompose_USP.
-
-1-3 : do ? (gimme interpretation; move /epsilon_interpretation; (nip; first nia) => ->).
-1-3 : by inspect_eqb.
+have HH : x < diophantine_variable_bound ds by admit.
+specialize (Hg x HH).
+match goal with [H1 : interpretation ?a ?m1, H2 : interpretation ?a ?m2 |- _] => have := interpretation_soundness H1 H2 end.
+intro. subst.
+by inspect_eqb.
+have HHx : x < diophantine_variable_bound ds by admit.
+have HHy : y < diophantine_variable_bound ds by admit.
+have HHz : z < diophantine_variable_bound ds by admit.
+have ? :=(Hg x HHx). have ? :=(Hg y HHy). have ? :=(Hg z HHz).
+match goal with [H1 : interpretation ?a ?m1, H2 : interpretation ?a ?m2 |- _] => have := interpretation_soundness H1 H2; clear H1 H2 end.
+match goal with [H1 : interpretation ?a ?m1, H2 : interpretation ?a ?m2 |- _] => have := interpretation_soundness H1 H2; clear H1 H2 end.
+match goal with [H1 : interpretation ?a ?m1, H2 : interpretation ?a ?m2 |- _] => have := interpretation_soundness H1 H2; clear H1 H2 end.
+intros. subst.
+by inspect_eqb.
+admit.
 
 case /(@in_app_or formula): H_In => [|H_In].
 move /HU => [? [? ?]]; subst; decompose_chain.
