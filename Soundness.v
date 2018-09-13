@@ -528,6 +528,8 @@ subst.
 gimme chain.
 move /inspect_chain_diophantines => [f H_f].
 constructor.
+
+(*
 have : ∃ g : nat → nat, Forall (λ d : diophantine, Diophantine.eval g d = true) ds /\ (forall (x : nat), dio_in x ds -> interpretation (f x) (1 + g x)).
 
 have : exists ds', Forall (normal_derivation (Nat.pred n) (ΓI ds' ++ ΓU ++ ΓS ++ ΓP)) params by eexists; eassumption.
@@ -612,10 +614,10 @@ apply : IH; auto.
 admit.
 move => [g Hg].
 exists g.
-
+*)
 
 (*rewrite flat_map_concat_map in H_f.*)
-(*exists (fun x => epsilon (inhabits 0) (fun m => interpretation (f x) (1+m))).*)
+exists (fun x => epsilon (inhabits 0) (fun m => interpretation (f x) (1+m))).
 apply Forall_forall.
 
 move => d H_d.
@@ -627,6 +629,8 @@ case : d HD H_d; cbn; intros.
 
 1-3 : decompose_Forall.
 1-3 : do ? decompose_USP.
+
+(*
 have HH : x < diophantine_variable_bound ds by admit.
 specialize (Hg x HH).
 match goal with [H1 : interpretation ?a ?m1, H2 : interpretation ?a ?m2 |- _] => have := interpretation_soundness H1 H2 end.
@@ -642,6 +646,9 @@ match goal with [H1 : interpretation ?a ?m1, H2 : interpretation ?a ?m2 |- _] =>
 intros. subst.
 by inspect_eqb.
 admit.
+*)
+1-3 : do ? (gimme interpretation; move /epsilon_interpretation; (nip; first nia) => ->).
+1-3 : by inspect_eqb.
 
 case /(@in_app_or formula): H_In => [|H_In].
 move /HU => [? [? ?]]; subst; decompose_chain.
