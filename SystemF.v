@@ -72,6 +72,29 @@ Inductive partial_chain (s t : formula) : list formula -> Prop :=
   | partial_chain_nil : contains s t -> partial_chain s t List.nil
   | partial_chain_cons : forall (s' t': formula) (ts: list formula), contains s (arr s' t') -> partial_chain t' t ts -> partial_chain s t (s' :: ts).
 
+Inductive derivation3 : nat -> list formula -> formula → Prop :=
+  | ax3 : forall (n : nat) (Γ : list formula) (s t: formula) (ts : list formula), 
+    Forall well_formed_formula Γ ->
+    In s Γ -> partial_chain s t ts -> Forall (derivation3 n Γ) ts ->
+    derivation3 (S n) Γ s
+  | intro_arr3 : forall (n : nat) (Γ : list formula) (s t : formula), 
+    derivation3 n (s :: Γ) t -> derivation3 (S n) Γ (arr s t)
+  | intro_quant3 : forall (n : nat) (Γ : list formula) (s : formula), 
+   (forall (a: label), derivation3 n Γ (instantiate (atom a) 0 s)) -> derivation3 (S n) Γ (quant s).
+
+
+Lemma prerequisive : forall (n : nat) (Γ : list formula) (s t : formula), 
+  Forall well_formed_formula Γ -> well_formed_formula (quant s) -> 
+  derivation3 n Γ (quant s) -> 
+  exists n, normal_derivation n Γ (instantiate t 0 s).
+Proof.
+elim /lt_wf_ind.
+move => n IH.
+intros.
+gimme derivation3; inversion.
+admit.
+Admitted.
+
 Lemma exists_partial_chain : forall (n : nat) (Γ : environment) (M : term) (t : formula),
   head_form M -> derivation2 n Γ M t -> 
   exists (s : formula) (ts : list formula), 
