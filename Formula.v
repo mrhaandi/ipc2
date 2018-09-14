@@ -9,6 +9,8 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
+
+
 (*used for free variables*)
 Definition label : Set := nat * nat.
 
