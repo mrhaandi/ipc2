@@ -1,21 +1,18 @@
-Require Import List.
-Import ListNotations.
-
-Require Import UserTactics.
-
+(*common header begin*)
+Require Import Utf8.
 From Coq Require Import ssreflect ssrfun ssrbool.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
-
 Set Maximal Implicit Insertion.
+(*common header end*)
 
-(*
-Lemma in_cons_iff : forall {A : Type} {a b : A} {l : list A}, In b (a :: l) = (a = b \/ In b l).
-Proof.
-auto with *.
-Qed.
-*)
+Require Import List.
+Import ListNotations.
+
+Require Import Omega.
+Require Import UserTactics.
+
 
 Lemma in_cons_iff : forall {A : Type} {a b : A} {l : list A}, In b (a :: l) <-> (a = b \/ In b l).
 Proof.
@@ -76,6 +73,17 @@ move /Forall_app => [? ?].
 case; [by intros; subst | auto].
 Qed.
 
+
+(*destructs all assumptions of the shape Forall P l where l matches cons, nil or app*)
+Ltac decompose_Forall := 
+  do ? (
+  match goal with
+  | [H : Forall _ (_ :: _) |- _] => inversion_clear H
+  | [H : Forall _ nil |- _] => inversion_clear H
+  | [H : Forall _ (_ ++ _) |- _] => move /Forall_app : H => [? ?]
+  end).
+
+
 (*tactic to decide list membership*)
 Ltac list_element :=
   (try assumption);
@@ -114,4 +122,22 @@ Ltac list_inclusion_veryfast :=
 Lemma in_sub : forall (T : Type) (A B : list T) (a : T), In a A -> (forall (b : T), In b A -> In b B) -> In a B.
 Proof.
 auto.
+Qed.
+
+Lemma Forall_exists_monotone : forall (A : Type) (P : nat -> A -> Prop) (l : list A), 
+  (forall (n m : nat) (a : A), P n a -> n <= m -> P m a) -> Forall (fun (a : A) => exists (n : nat), P n a) l ->
+  exists (n : nat), Forall (P n) l.
+Proof.
+move => A P l H. elim : l.
+
+intros; exists 0; auto.
+
+move => a l IH; inversion.
+gimme Forall. move /IH.
+gimme where P; move => [n1 ?].
+move => [n2 ?].
+exists (n1+n2); constructor.
+apply : H; [eassumption | omega].
+apply : Forall_impl; last eassumption.
+intros; apply : H; [eassumption | omega].
 Qed.

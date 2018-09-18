@@ -433,8 +433,7 @@ Theorem soundness : forall (n : nat) (ΓU ΓS ΓP : list formula),
   Diophantine.solvable ds.
 Proof.
 have ? := interpretation_one.
-move => n; apply (lt_wf_ind n).
-move => {n} n IH.
+elim /lt_wf_ind => n IH.
 
 intros until 0 => HU HS HP ds ?.
 decompose_normal_derivation.
@@ -463,8 +462,7 @@ move /inv_normal_arr => [n' [? ?]].
 gimme normal_derivation => HD.
 apply (normal_weakening (Δ := (ΓI ds ++ ΓU ++ ΓS' ++ ΓP))) in HD.
 2:{ list_inclusion. }
-have ? : n' < n by omega.
-eapply IH; eassumption.
+eapply IH; try eassumption; omega.
 
 (*shown Gamma S inductive case*)
 (*NEXT: Gamma U inductive case*)
@@ -519,8 +517,7 @@ gimme normal_derivation.
 move /inv_normal_arr => [n' [? HD]].
 apply (normal_weakening (Δ := (ΓI ds ++ ΓU ++ ΓS ++ ΓP'))) in HD.
 2:{ list_inclusion. }
-have ? : n' < n by omega.
-eapply IH; eassumption.
+eapply IH; try eassumption; omega.
 
 case : H_In => [?|H_In].
 (*lettuce show s_x_d ds*)

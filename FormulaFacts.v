@@ -12,6 +12,8 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
+Require Import ListFacts.
+
 (*Notation label := (nat * nat).*)
 
 Module Lc.
