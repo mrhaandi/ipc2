@@ -407,27 +407,11 @@ intros.
 apply : interpretation_soundness; eassumption.
 Qed.
 
-Fixpoint dio_variables (d : diophantine) :=
-  match d with
-  | (dio_one x) => [x]
-  | (dio_sum x y z) => [x; y; z]
-  | (dio_prod x y z) => [x; y; z]
-  end.
-
-Definition dio_in (x : nat) (ds : list diophantine) := In x (flat_map dio_variables ds).
-
-(*
-Inductive dio_in (x : nat) : diophantine -> Prop :=
-  | dio_in_one : dio_in x (dio_one x)
-  | dio_in_sum : forall (x' y' z' : nat), x = x' \/ x = y' \/ x = z' -> dio_in x (dio_sum x' y' z')
-  | dio_in_prod : forall (x' y' z' : nat), x = x' \/ x = y' \/ x = z' -> dio_in x (dio_prod x' y' z').
-*)
-
 
 Theorem soundness : forall (n : nat) (ΓU ΓS ΓP : list formula), 
-  (forall {s : formula}, In s ΓU -> represents_nat s) ->
-  (forall {s : formula}, In s ΓS -> encodes_sum s) ->
-  (forall {s : formula}, In s ΓP -> encodes_prod s) ->
+  (forall (s : formula), In s ΓU -> represents_nat s) ->
+  (forall (s : formula), In s ΓS -> encodes_sum s) ->
+  (forall (s : formula), In s ΓP -> encodes_prod s) ->
   forall (ds : list diophantine),
   normal_derivation n ((Encoding.ΓI ds) ++ ΓU ++ ΓS ++ ΓP) Encoding.triangle ->
   Diophantine.solvable ds.
@@ -437,182 +421,77 @@ elim /lt_wf_ind => n IH.
 
 intros until 0 => HU HS HP ds ?.
 decompose_normal_derivation.
-gimme In. case => [?|H_In]. subst.
+gimme In; case => [? | H_In].
+subst.
 gimme chain. move /chain_intro_sum => [s1 [s2 [s3 [s4 [s5 ?]]]]]. subst.
+decompose_Forall. do ? decompose_USP.
+gimme normal_derivation; inversion.
+gimme normal_derivation. move /(normal_weakening (Δ := (ΓI ds ++ ΓU ++ (S s1 s4 s5 :: ΓS) ++ ΓP))).
+move /(_ ltac:(clear; list_inclusion)).
+apply /IH; try eassumption + omega.
 
-decompose_Forall.
-do ? decompose_USP.
-set ΓS' := S s1 s4 s5 :: ΓS.
-
-have HS' : (∀ (s : formula), In s ΓS' → encodes_sum s).
-
-intros s' Hs'.
-destruct Hs'. 
-subst s'.
-unfold encodes_sum.
-exists s1, s4, s5.
-split; first reflexivity.
-do 3 eexists.
-do ? (split; first eassumption).
-omega.
-
-by apply: HS.
-gimme normal_derivation.
-move /inv_normal_arr => [n' [? ?]].
-gimme normal_derivation => HD.
-apply (normal_weakening (Δ := (ΓI ds ++ ΓU ++ ΓS' ++ ΓP))) in HD.
-2:{ list_inclusion. }
-eapply IH; try eassumption; omega.
+(*show that S s1 s4 s5 encodes sum*)
+intro; case; last eauto.
+intro; subst.
+do 3 eexists; split; first reflexivity.
+do 3 eexists; do 3 (split; first eassumption).
+lia.
 
 (*shown Gamma S inductive case*)
 (*NEXT: Gamma U inductive case*)
-case : H_In => [?|H_In]. 
+case : H_In => [? | H_In]. 
 subst. gimme chain. move /chain_intro_element => [s [? ?]]; subst.
 decompose_Forall. do ? decompose_USP.
 match goal with [_ : interpretation s ?s_m |- _] => rename s_m into m end.
 
-gimme normal_derivation => HD.
-decompose_normal_derivation.
+gimme normal_derivation; inversion.
 
 pose sm' := represent_nat (Datatypes.S m).
-move /(_ (get_label sm')) : HD.
+gimme where normal_derivation. move /(_ (get_label sm')).
 (*simplify goal type*)
 have : (instantiate (atom (get_label sm')) 0 (arr (U (var 0)) (arr (S s one (var 0)) (arr (P (var 0) one (var 0)) triangle)))) = 
 (arr (U sm') (arr (S (instantiate sm' 0 s) one sm') (arr (P sm' one sm') triangle))) by reflexivity.
 move => ->.
 rewrite Lc.instantiate_eq0; first assumption.
 move => HD.
-do ? (let n := fresh "n" in move /inv_normal_arr : HD => [? [? HD]]).
-eapply (normal_weakening (Δ := (ΓI ds ++ (U sm' :: ΓU) ++ (S s one sm' :: ΓS) ++ (P sm' one sm' :: ΓP)))) in HD; 
-  last by list_inclusion.
+do 3 (gimme normal_derivation; inversion).
+gimme normal_derivation. move /(normal_weakening (Δ := (ΓI ds ++ (U sm' :: ΓU) ++ (S s one sm' :: ΓS) ++ (P sm' one sm' :: ΓP)))).
+move /(_ ltac:(clear; list_inclusion)).
 
-apply: IH HD; first (by omega).
-1-3 : move => s'.
-1-3 : case; last eauto.
-1-3 : move => ?; subst.
+apply /IH; first omega.
+1-3 : intro; case; last eauto.
+1-3 : intro; subst.
 exists (Datatypes.S m); split; done + omega.
 1-2 : do 3 eexists; split; first reflexivity.
 1-2 : have ? := interpretation_of_representation (Datatypes.S m).
 1-2 : (do 3 eexists); (do 3 (split; first eassumption)); omega.
 (*shown Gamma U inductive case*)
 (*NEXT: Gamma P inductive case*)
-case : H_In => [|H_In].
-move => ?; subst.
+case : H_In => [? | H_In].
+
+subst.
 gimme chain. move /chain_intro_prod => [s1 [s2 [s3 [s4 [s5 ?]]]]]. subst.
+decompose_Forall. do ? decompose_USP.
+gimme normal_derivation; inversion.
+gimme normal_derivation. move /(normal_weakening (Δ := (ΓI ds ++ ΓU ++ ΓS ++ (P s1 s4 s5 :: ΓP)))).
+move /(_ ltac:(clear; list_inclusion)).
+apply /IH; try eassumption + omega.
 
-decompose_Forall.
-do ? decompose_USP.
-set ΓP' := P s1 s4 s5 :: ΓP.
-
-have HP' : (∀ (s : formula), In s ΓP' → encodes_prod s).
-move => s'. 
-case; last by auto.
-move => ?; subst; do 3 eexists.
-split => //.
-do 3 eexists.
-do ? (split; first eassumption).
+(*show that P s1 s4 s5 encodes prod*)
+intro; case; last eauto.
+intro; subst.
+do 3 eexists; split; first reflexivity.
+do 3 eexists; do 3 (split; first eassumption).
 nia.
 
-gimme normal_derivation.
-move /inv_normal_arr => [n' [? HD]].
-apply (normal_weakening (Δ := (ΓI ds ++ ΓU ++ ΓS ++ ΓP'))) in HD.
-2:{ list_inclusion. }
-eapply IH; try eassumption; omega.
-
-case : H_In => [?|H_In].
+case : H_In => [? | H_In].
 (*lettuce show s_x_d ds*)
 subst.
 gimme chain.
 move /inspect_chain_diophantines => [f H_f].
 constructor.
-have : ∃ g : nat → nat, Forall (λ d : diophantine, Diophantine.eval g d = true) ds /\ (forall (x : nat), dio_in x ds -> interpretation (f x) (1 + g x)).
-
-have : exists ds', Forall (normal_derivation (Nat.pred n) (ΓI ds' ++ ΓU ++ ΓS ++ ΓP)) params by eexists; eassumption.
-clear H1.
-move => [ds' H1].
-gimme Forall => HD.
-apply Forall_tl in HD.
-rewrite H_f in HD.
-clear H_f.
-revert dependent ds.
-elim.
-intros. exists (fun _ => 0).
-cbn. 
-intuition.
-case.
-move => x ds {IH} IH.
-cbn.
-intros.
-decompose_Forall.
-do ? decompose_USP.
-have := (IH ltac:(assumption)).
-move => [g [Hg1 Hg2]].
-match goal with [ _ : interpretation (f x) ?m |- _] => rename m into m1 end.
-set g' := fun x' => if x' =? x then Nat.pred m1 else g x'.
-exists g'.
-split.
-constructor.
-cbn.
-subst g'. cbn. inspect_eqb. inspect_eqb. auto.
-admit. (*can be showh, but tedious*)
-move => x'.
-case.
-intro. subst. subst g'. cbn. inspect_eqb. have : (Datatypes.S (Nat.pred m1)) = m1 by omega. move => ->. assumption.
-move => Hx'.
-move /(_ x' Hx') : Hg2.
-subst g'. cbn.
-(*preservation of interpretation*)
-case : (Nat.eq_dec x' x).
-move => ?. subst. inspect_eqb.
-move /(interpretation_soundness).
-move /(_ _ ltac:(eassumption)). intros. subst. assumption.
-intro. inspect_eqb. auto.
-(*can be shown*)
-
-eapply Forall_flat_map in HD; try eassumption.
-case : d HD H_d; cbn; intros.
-
-
-
-have 
-have : Forall (normal_derivation (Nat.pred n) (ΓI ds ++ ΓU ++ ΓS ++ ΓP)) params
-
-have : exists (g : nat -> nat), forall (x : nat), dio_in x ds -> interpretation (f x) (1+ g x).
-clear H2.
-have ? : Forall (normal_derivation (Nat.pred n) (triangle :: ΓU ++ ΓS ++ ΓP)) (flat_map (represent_diophantine_repr f) ds) by admit.
-clear H1 H_f.
-
-(*move Heq : (ds) => ds'.
-have : forall (d : diophantine), In d ds' -> In d ds by subst; auto.
-clear Heq.*)
-revert dependent ds.
-
-elim.
-
-cbn.
-intros.
-exists (fun _ => 0).
-done.
-case.
-move => x ds {IH} IH .
-cbn.
-intros.
-decompose_Forall.
-have := (IH H2).
-move => [g Hg].
-decompose_USP.
-exists (fun x' => if x' =? x then )
-cbn.
-intros.
-apply : IH; auto.
-
-admit.
-move => [g Hg].
-exists g.
-
-
 (*rewrite flat_map_concat_map in H_f.*)
-(*exists (fun x => epsilon (inhabits 0) (fun m => interpretation (f x) (1+m))).*)
+exists (fun x => epsilon (inhabits 0) (fun m => interpretation (f x) (1+m))).
 apply Forall_forall.
 
 move => d H_d.
@@ -624,21 +503,9 @@ case : d HD H_d; cbn; intros.
 
 1-3 : decompose_Forall.
 1-3 : do ? decompose_USP.
-have HH : x < diophantine_variable_bound ds by admit.
-specialize (Hg x HH).
-match goal with [H1 : interpretation ?a ?m1, H2 : interpretation ?a ?m2 |- _] => have := interpretation_soundness H1 H2 end.
-intro. subst.
-by inspect_eqb.
-have HHx : x < diophantine_variable_bound ds by admit.
-have HHy : y < diophantine_variable_bound ds by admit.
-have HHz : z < diophantine_variable_bound ds by admit.
-have ? :=(Hg x HHx). have ? :=(Hg y HHy). have ? :=(Hg z HHz).
-match goal with [H1 : interpretation ?a ?m1, H2 : interpretation ?a ?m2 |- _] => have := interpretation_soundness H1 H2; clear H1 H2 end.
-match goal with [H1 : interpretation ?a ?m1, H2 : interpretation ?a ?m2 |- _] => have := interpretation_soundness H1 H2; clear H1 H2 end.
-match goal with [H1 : interpretation ?a ?m1, H2 : interpretation ?a ?m2 |- _] => have := interpretation_soundness H1 H2; clear H1 H2 end.
-intros. subst.
-by inspect_eqb.
-admit.
+
+1-3 : do ? (gimme interpretation; move /epsilon_interpretation; (nip; first nia) => ->).
+1-3 : by inspect_eqb.
 
 case /(@in_app_or formula): H_In => [|H_In].
 move /HU => [? [? ?]]; subst; decompose_chain.

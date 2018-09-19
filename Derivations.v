@@ -18,7 +18,6 @@ Inductive derivation (Γ: list formula) : formula → Prop :=
   | ax : ∀ (s: formula), In s Γ → derivation Γ s
   | elim_arr : ∀ (s t : formula), derivation Γ (Formula.arr s t) → derivation Γ s → derivation Γ t
   | intro_arr : ∀ (s t : formula), derivation (s :: Γ) t → derivation Γ (Formula.arr s t)
-  (*| elim_quant : ∀ (s t : formula), derivation Γ (Formula.quant s) → lc 0 t → derivation Γ (instantiate t 0 s)*)
   | elim_quant : ∀ (s t : formula), derivation Γ s → contains s t → derivation Γ t
   | intro_quant : ∀ (s: formula), 
    (forall (a: label), derivation Γ (instantiate (atom a) 0 s)) → derivation Γ (Formula.quant s).
