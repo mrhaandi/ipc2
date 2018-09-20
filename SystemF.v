@@ -17,6 +17,14 @@ Unset Printing Implicit Defensive.
 Require Import Term.
 Require Import Derivations.
 
+(*additional lemmas*)
+Lemma lc_bind : forall (M : term) (n : nat) (x : label), Term.lc n M -> Term.lc (S n) (Term.bind x n M).
+Proof.
+elim; cbn.
+move => y; intros; case : (Label.eqb x y); constructor; omega.
+all: intros; gimme Term.lc; inversion; constructor; auto + omega.
+Qed.
+
 Definition environment : Set := list (label * formula).
 
 Definition fresh_term_label (x : label) (Γ : environment) := Forall (fun '(y, _) => x <> y) Γ.
@@ -43,17 +51,34 @@ Inductive f_derivation (Γ: environment) : term -> formula -> Prop :=
   | f_ax : forall (x : label) (s: formula), well_formed_environment Γ -> 
     In (x, s) Γ -> f_derivation Γ (free_var x) s
   | f_elim_arr : forall (M N : term) (s t : formula), 
-    well_formed_environment Γ -> 
     f_derivation Γ M (Formula.arr s t) -> f_derivation Γ N s -> f_derivation Γ (term_app M N) t
   | f_intro_arr : forall (x : label) (s t : formula) (M : term), 
-    well_formed_environment ((x, s) :: Γ) -> 
     f_derivation ((x, s) :: Γ) M t -> f_derivation Γ (term_abs (Term.bind x 0 M)) (arr s t)
   | f_elim_quant : forall (M : term) (s t : formula), 
-    well_formed_environment Γ -> 
     f_derivation Γ M (quant s) -> well_formed_formula t -> f_derivation Γ M (instantiate t 0 s)
   | f_intro_quant : forall (M : term) (a : label) (s: formula), 
-    well_formed_environment Γ -> 
     fresh_formula_label a Γ -> f_derivation Γ M s -> f_derivation Γ M (quant (Formula.bind a 0 s)).
+
+
+Lemma f_derivation_wft : forall (Γ : environment) (M : term) (t : formula), 
+  f_derivation Γ M t -> well_formed_term M.
+Proof.
+intros until 0; elim => //.
+
+intros; do ? constructor.
+
+intros; do 2 (gimme well_formed_term; inversion); by do 2 constructor.
+
+intros; gimme well_formed_term; inversion; do 2 constructor.
+by apply : lc_bind.
+Qed.
+
+Lemma f_derivation_wfe : forall (Γ : environment) (M : term) (t : formula), 
+  f_derivation Γ M t -> well_formed_environment Γ.
+Proof.
+intros until 0; elim => //.
+intros; gimme well_formed_environment; by inversion.
+Qed.
 
 Inductive derivation2 : nat -> environment -> term -> formula → Prop :=
   | ax : forall (n : nat) (Γ : environment) (x : label) (s: formula), 
@@ -65,7 +90,7 @@ Inductive derivation2 : nat -> environment -> term -> formula → Prop :=
   | elim_quant : forall (n : nat) (Γ : environment) (M : term) (s t : formula), 
     derivation2 n Γ M (quant s) -> lc 0 t -> derivation2 (S n) Γ M (instantiate t 0 s)
   | intro_quant : forall (n : nat) (Γ : environment) (M : term) (s : formula), 
-   (forall (a: label), derivation2 n Γ M (instantiate (atom a) 0 s)) -> derivation2 (S n) Γ M (quant s).
+    (forall (a: label), derivation2 n Γ M (instantiate (atom a) 0 s)) -> derivation2 (S n) Γ M (quant s).
 
 (*chain s a params morally means that s can be instanciated as p1 -> ... -> pn -> a*)
 Inductive partial_chain (s t : formula) : list formula -> Prop :=
@@ -101,26 +126,10 @@ constructor.
 
 Qed.
 
-Lemma lc_bind : forall (M : term) (n : nat) (x : label), Term.lc n M -> Term.lc (S n) (Term.bind x n M).
-Proof.
-elim; cbn.
-move => y; intros; case : (Label.eqb x y); constructor; omega.
-all: intros; gimme Term.lc; inversion; constructor; auto + omega.
-Qed.
 
 
-Lemma f_derivation_wft : forall (Γ : environment) (M : term) (t : formula), 
-  f_derivation Γ M t -> well_formed_term M.
-Proof.
-intros until 0; elim => //.
 
-intros; do ? constructor.
 
-intros; do 2 (gimme well_formed_term; inversion); by do 2 constructor.
-
-intros; gimme well_formed_term; inversion; do 2 constructor.
-by apply : lc_bind.
-Qed.
 
 Lemma bind_normal_and_head : forall (x : label) (N : term) (n : nat), 
   (normal_form (Term.bind x n N) -> normal_form N) /\ (head_form (Term.bind x n N) -> head_form N).
@@ -159,8 +168,124 @@ Fixpoint formula_size (t : formula) :=
   | (quant s) => 1+(formula_size s)
   end.
 
+Lemma normal_derivation_exists_quant : forall (Γ : list formula) (s : formula),
+  (forall (a : label), exists (n : nat), normal_derivation n Γ (instantiate (atom a) 0 s)) ->
+  exists (n : nat), normal_derivation n Γ (quant s).
+Proof.
+intros until 0 => H.
+have [a ?] := exists_fresh (s :: Γ).
+decompose_Forall.
+gimme where normal_derivation. move /(_ a) => [n ?].
+exists (S n). constructor. move => b.
+gimme normal_derivation.
+move /substitute_normal_derivation. move /(_ a b).
+rewrite rename_instantiation; first done.
+rewrite <- map_substitute_fresh_label; last done.
+apply.
+Qed.
 
 
+Lemma contains_transitivity : forall s t u, contains s t -> contains t u -> contains s u.
+Proof.
+intros until 0; elim => //.
+intros; apply : contains_trans; eauto.
+Qed.
+
+
+Lemma instantiate_partial_chain : forall a s t ts, partial_chain s (quant t) ts -> partial_chain s (instantiate (atom a) 0 t) ts.
+Proof.
+intros until 0.
+elim : ts s t.
+
+move => s t. inversion. constructor.
+gimme contains. move /contains_transitivity.
+apply.
+apply : contains_trans; last constructor. constructor.
+
+move => t ts IH.
+move => s' t'. inversion.
+apply : partial_chain_cons; first eassumption.
+by apply : IH.
+Qed.
+
+
+Lemma formula_size_instantiate_atom : forall a s n, formula_size (instantiate (atom a) n s) = formula_size s.
+Proof.
+intro.
+elim; cbn => //.
+move => n m.
+case : (m =? n); done.
+
+all: intros; eauto.
+Qed.
+
+
+Lemma partial_chain_arr : forall ts s t u, partial_chain s (arr t u) ts -> partial_chain s u (ts ++ [t]).
+Proof.
+elim.
+intros until 0; inversion.
+apply : partial_chain_cons; try eassumption + constructor.
+constructor.
+
+move => t' ts IH.
+intros until 0; inversion.
+apply : partial_chain_cons; try eassumption.
+by apply IH.
+Qed.
+
+Lemma contains_wff : forall s t, well_formed_formula s -> contains s t -> well_formed_formula t.
+Proof.
+(*doable*)
+Admitted.
+
+
+Lemma partial_chain_wff : forall ts s t, well_formed_formula s -> partial_chain s t ts -> well_formed_formula t.
+Proof.
+elim.
+intros. gimme partial_chain. inversion.
+apply : contains_wff; eassumption.
+
+move => u ts IH.
+intros. gimme partial_chain. inversion.
+apply : IH; last eassumption.
+gimme contains. move /contains_wff.
+nip; first auto. inversion. gimme lc. inversion.
+by constructor.
+Qed.
+
+Lemma partial_chain_atom : forall a ts s, partial_chain s (atom a) ts -> chain s a ts.
+Proof.
+move => a; elim.
+intros until 0. inversion. by constructor.
+
+move => t ts IH s.
+inversion. apply : chain_cons; eauto.
+Qed.
+
+Lemma relax_depth_normal_derivation : forall (n m : nat) (Γ : list formula) (s : formula), 
+  normal_derivation n Γ s → n <= m -> normal_derivation m Γ s.
+Proof.
+elim /lt_wf_ind.
+move => n IH. intros.
+gimme normal_derivation. inversion.
+
+all: have : m = S (Nat.pred m) by omega.
+all: move => ->.
+
+constructor.
+apply : IH; try eassumption; omega.
+
+constructor.
+move => a. gimme where normal_derivation. move /(_ a) => ?.
+apply : IH; try eassumption; omega.
+
+apply : derive_atom; try eassumption.
+apply : Forall_impl; last eassumption.
+intros. apply : IH; try eassumption; omega.
+Qed.
+
+
+(*almost shown, TODO*)
 Lemma eta_longness : forall (Γ : list formula) (s t : formula) (ts : list formula), 
   Forall well_formed_formula Γ -> In s Γ -> partial_chain s t ts -> 
   Forall (fun t => exists (n : nat), normal_derivation n Γ t) ts -> exists (n : nat), normal_derivation n Γ t.
@@ -170,66 +295,136 @@ move H : (formula_size t) => n.
 elim /lt_wf_ind : n Γ s t H.
 move => n IH Γ s. case.
 
+{ (*case var, contradiction*)
 intros until 0 => ? ?.
-admit. (*easy by well_formed_formula*)
-(*move //. inversion.
-gimme lc; inversion. omega.*)
+intros. gimme partial_chain. move /partial_chain_wff.
+nip. 
+gimme In. gimme Forall where well_formed_formula.
+rewrite Forall_forall. by move //.
+inversion. gimme lc. inversion. omega.
+}
 
-(*case atom*)
+{(*case atom*)
 intros.
-admit. (*mostly easy*)
-(*
-eexists. apply : derive_atom.
-gimme or; case.
-exists 0. apply : derive_atom; try eassumption.
-do 2 constructor. constructor. auto.
+gimme In.
+gimme Forall.
+move /Forall_exists_monotone.
+nip.
+intros. apply : relax_depth_normal_derivation; eassumption.
+move => [n'].
 
-move => [? ?].
-gimme where formula_size; cbn => ?.
-move /(_ (formula_size s) ltac:(omega) Γ (var 0) s) : IH.
-do 2 (nip; first done).
-nip; first auto.
-move => [n' ?]. exists (S n').
-apply : derive_atom.
-eassumption.
-apply : chain_cons.
-constructor.
-do 2 constructor.
-constructor; last constructor.
-assumption.
-left; omega.
-*)
+gimme partial_chain. move /partial_chain_atom. move /derive_atom.
+do 2 move //.
+eauto.
+}
 
-(*case arr*)
+{ (*case arr*)
 move => s' t'; cbn => ?.
 intros.
-have : partial_chain s t' (s' :: ts).
-admit. (*easy*)
+
+have ? : well_formed_formula s'.
+gimme partial_chain. move /partial_chain_wff.
+nip. 
+gimme In.
+gimme Forall where well_formed_formula.
+rewrite Forall_forall. by move //.
+inversion. gimme lc. inversion. by constructor.
+
+gimme partial_chain. move /partial_chain_arr.
+
 gimme In. move /(@in_cons formula s').
 move : (IH). move //. move //.
 move /(_ _ _ ltac:(reflexivity)).
 nip; first omega.
-nip; first admit. (*show s' well-formedness*)
-nip; first admit. (*easy*)
+nip. constructor; auto.
+
+nip. 
+rewrite Forall_app. split.
+apply : Forall_impl; last eassumption.
+cbn. move => u [n' ?]. exists n'.
+gimme normal_derivation. apply /normal_weakening.
+intros. by apply in_cons.
+
+constructor; last done.
+have : partial_chain s' s' [] by do 2 constructor.
+move /IH. apply; try (by constructor). omega.
+
 move => [n' ?].
 exists (S n').
 by apply : derive_arr. 
+}
 
-(*case quant*)
+{ (*case quant*)
 cbn => s'; intros.
-Admitted.
+apply normal_derivation_exists_quant => a.
+apply : IH; try eassumption + reflexivity.
+rewrite formula_size_instantiate_atom; omega.
+gimme partial_chain. apply /instantiate_partial_chain.
+}
+Qed.
+
 
 (*repeated instantiation by locally closed formulae*)
 Inductive contains_depth : nat -> formula -> formula -> Prop :=
   | contains_depth_rfl : forall (s: formula), contains_depth 0 s s
   | contains_depth_trans : forall (n : nat) (s t u: formula), lc 0 s -> contains_depth n (instantiate s 0 u) t -> contains_depth (S n) (quant u) t.
 
+(*replace all occurrences of a in s by t*)
+Fixpoint substitute (a : label) (s t : formula) : formula :=
+  match t with
+    | (atom b) => if Label.eqb a b then s else t
+    | (var _) => t
+    | (arr s' t') => arr (substitute a s s') (substitute a s t')
+    | (quant t') => quant (substitute a s t')
+  end.
+
+Lemma eqb_eq' : forall (a b : label), a = b -> (Label.eqb a b = true).
+Proof.
+intros.
+by apply (Label.eqb_eq a b).
+Qed.
+
+(*MOST IMPORTANT LEMMA*)
+Lemma prerequisive0 : forall (a : label) (s : formula), lc 0 s -> forall (n : nat) (Γ : list formula) (t : formula), 
+  normal_derivation n Γ t -> ∃ n : nat, normal_derivation n (map (substitute a s) Γ) (substitute a s t).
+Proof.
+move => a s ?.
+elim /lt_wf_ind; cbn.
+move => n IH; intros.
+gimme normal_derivation; inversion.
+
+{
+gimme normal_derivation; move /IH.
+move /(_ ltac:(omega)) => [n ?].
+exists (S n). cbn. by constructor.
+}
+
+{
+admit. (*exchange forall exists*)
+}
+
+{
+cbn.
+match goal with [_ : chain _ ?a' _ |- _] => rename a' into b end.
+case : (Label.eq_dec a b).
+intro. subst. rewrite eqb_eq'; first done.
+(*needs partial chain derivations*)
+admit. (*???*)
+
+Admitted.
+
 Lemma prerequisive : forall (n : nat) (Γ : list formula) (s t : formula), Forall well_formed_formula Γ -> well_formed_formula (quant s) -> 
   normal_derivation n Γ (quant s) -> 
   exists n, normal_derivation n Γ (instantiate t 0 s).
 Proof.
-elim /lt_wf_ind.
-move => n IH.
+intros.
+gimme normal_derivation; inversion.
+have := exists_fresh (s :: t :: Γ) => [[a ?]].
+decompose_Forall.
+gimme where normal_derivation. move /(_ a).
+revert dependent a => a.
+revert dependent Γ.
+
 Admitted.
 
 (*key lemma*)

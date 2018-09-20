@@ -18,7 +18,6 @@ Inductive derivation (Γ: list formula) : formula → Prop :=
   | ax : ∀ (s: formula), In s Γ → derivation Γ s
   | elim_arr : ∀ (s t : formula), derivation Γ (Formula.arr s t) → derivation Γ s → derivation Γ t
   | intro_arr : ∀ (s t : formula), derivation (s :: Γ) t → derivation Γ (Formula.arr s t)
-  (*| elim_quant : ∀ (s t : formula), derivation Γ (Formula.quant s) → lc 0 t → derivation Γ (instantiate t 0 s)*)
   | elim_quant : ∀ (s t : formula), derivation Γ s → contains s t → derivation Γ t
   | intro_quant : ∀ (s: formula), 
    (forall (a: label), derivation Γ (instantiate (atom a) 0 s)) → derivation Γ (Formula.quant s).
@@ -32,7 +31,7 @@ Inductive normal_derivation : nat → list formula → formula → Prop :=
 (* | derive_atom : ∀ (n : nat) (Γ: list formula) (a: label) (s: formula) (params: list formula), 
       In s Γ → Formula.chain s params a → (Forall (normal_derivation n Γ) (params)) → normal_derivation (if params is nil then n else S n) Γ (Formula.atom a).*)
   | derive_atom : ∀ (n : nat) (Γ: list formula) (a: label) (s: formula) (params: list formula), 
-      In s Γ → Formula.chain s a params → (Forall (normal_derivation (Nat.pred n) Γ) (params)) → (n <> 0 \/ params = nil) → normal_derivation n Γ (Formula.atom a).
+      In s Γ → Formula.chain s a params → (Forall (normal_derivation n Γ) (params)) → normal_derivation (S n) Γ (Formula.atom a).
 
 Conjecture normalization : forall (Γ: list formula) (s: formula), derivation Γ s → exists (n : nat), normal_derivation n Γ s.
 
@@ -51,23 +50,19 @@ Proof.
 elim; intros until 0.
 
 (*base case n = 0*)
-inversion. intuition. subst.
-gimme chain; inversion; derivation_rule.
+inversion.
 
-(*inductive case n > 0*)
 move => IH Γ *.
-gimme normal_derivation; inversion; auto using intro_arr, intro_quant.
+gimme normal_derivation; inversion; try derivation_rule.
 
 (*atom case*)
 gimme In; move /ax.
 gimme Forall;
 gimme chain; elim.
-(*one step chain*) derivation_rule.
-(*multistep chain*) move => ? ? t u *.
-decompose_Forall.
 
-have ? : derivation Γ u by derivation_rule.
-auto.
+(*zero step chain*) derivation_rule.
+(*multistep chain*) move => ? ? t u *.
+decompose_Forall. derivation_rule.
 Qed.
 
 (*inversion lemmas*)
@@ -127,7 +122,7 @@ Ltac decompose_normal_derivation :=
     let n := fresh "n" in move /inv_normal_quant : H => [n [? H]]
   | [H : normal_derivation _ _ (arr _ _) |- _ ] => 
     let n := fresh "n" in move /inv_normal_arr : H => [n [? H]]
-  | [H : normal_derivation _ _ _ |- _] => inversion_clear H
+  | [H : normal_derivation _ _ _ |- _] => move : H; inversion
   end).
 
 Ltac decompose_chain :=
@@ -178,7 +173,7 @@ Tactic Notation "gimme" "where" constr(p) :=
 Lemma substitute_normal_derivation : forall (n : nat) (s : formula) (Γ : list formula) (a b : label), 
   normal_derivation n Γ s -> normal_derivation n (map (substitute_label a b) Γ) (substitute_label a b s).
 Proof.
-move => n; apply (lt_wf_ind n).
+elim /lt_wf_ind.
 
 intros until 0 => IH; intros.
 
@@ -214,17 +209,14 @@ set params' := map (substitute_label a b) params.
 have ? : In s' Γ' by apply : in_map; assumption.
 have ? : chain s' a' params' by apply : substitute_chain; assumption.
 
-have ? : Forall (normal_derivation (Nat.pred n0) Γ') params'.
-gimme Forall; move : IH; gimme or; clear; revert dependent params.
+have ? : Forall (normal_derivation n0 Γ') params'.
+gimme Forall; move : IH; clear; revert dependent params.
 elim; cbn; first done.
 
 intros; decompose_Forall.
-gimme or; case; last done; move => ?.
-match goal with [_ : ?n' ≠ 0 |- _] => have ? : Nat.pred n' < n' by omega end.
 eauto.
 
 apply : derive_atom; try eassumption.
-gimme or; case => ?; last subst params' params; auto.
 Qed.
 
 
@@ -257,20 +249,18 @@ Lemma normal_weakening : ∀ (n : nat) (Γ Δ: list formula),
 Proof.
 elim.
 intros until 0 => ? ?; inversion.
-intuition; subst.
-apply: derive_atom; eauto.
 
 move => n IH Γ Δ H_in t; inversion.
 (*case arr*)
-apply: derive_arr. apply: IH; try eassumption.
+constructor. apply: IH; try eassumption.
 move => s'. move : (H_in s').
 list_inclusion.
 
 (*case quant*)
-apply: derive_quant. eauto.
+constructor. eauto.
 (*case atom*)
 apply: derive_atom; eauto.
-gimme Forall; rewrite -> ? Forall_forall.
+apply : Forall_impl; last eassumption.
 eauto.
 Qed.
 

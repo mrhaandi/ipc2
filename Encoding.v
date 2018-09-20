@@ -327,9 +327,18 @@ Lemma simplify_instantiate_S : forall (s t1 t2 t3 : formula) (n : nat), instanti
 Proof. auto. Qed.
 Lemma simplify_instantiate_P : forall (s t1 t2 t3 : formula) (n : nat), instantiate s n (P t1 t2 t3) = P (instantiate s n t1) (instantiate s n t2) (instantiate s n t3).
 Proof. auto. Qed.
+Lemma simplify_atom_get_label : forall t, (exists a, t = atom a) -> (atom (get_label t)) = t.
+Proof. intros until 0. case => a. move => ->. reflexivity. Qed.
+Lemma simplify_instantiate_one : forall s n, instantiate s n one = one.
+Proof. intros; reflexivity. Qed.
+Lemma simplify_instantiate_triangle : forall s n, instantiate s n triangle = triangle.
+Proof. intros; reflexivity. Qed.
 
 Hint Rewrite simplify_instantiate_U simplify_instantiate_S simplify_instantiate_P : simplify_formula.
 Hint Rewrite simplify_instantiate_arrow : simplify_formula.
 Hint Rewrite simplify_instantiate_var_eq simplify_instantiate_var_neq using omega : simplify_formula.
 Hint Rewrite simplify_instantiate_quant using omega : simplify_formula.
 Hint Rewrite simplify_instantiate_atom using (eexists; reflexivity) : simplify_formula.
+Hint Rewrite simplify_instantiate_one simplify_instantiate_triangle : simplify_formula.
+Hint Rewrite simplify_atom_get_label using (eexists; reflexivity) : simplify_formula.
+Hint Rewrite Lc.instantiate_eq0 using done : simplify_formula.
