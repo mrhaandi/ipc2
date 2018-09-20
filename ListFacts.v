@@ -58,19 +58,14 @@ case => [-> | ?]; move /Forall_cons => [? ?]; auto.
 Qed.
 
 
-Lemma Forall_flat_map (T U: Type) (P : T -> Prop) : forall (ds : list U)
-    (params : list T) 
-    (f : U -> list T)
-     (d : U), Forall P (flat_map f ds) ->
-In d ds -> Forall P (f d).
+Lemma Forall_flat_map (T U: Type) (P : T -> Prop) : forall (ds : list U) (f : U -> list T) (d : U), 
+  Forall P (flat_map f ds) -> In d ds -> Forall P (f d).
 Proof.
 elim; first done.
-intros until 0 => IH.
 cbn.
-intros until 0 => H.
-intros until 0.
-move /Forall_app => [? ?].
-case; [by intros; subst | auto].
+intros.
+gimme Forall; move /Forall_app => [? ?].
+firstorder (subst; done).
 Qed.
 
 

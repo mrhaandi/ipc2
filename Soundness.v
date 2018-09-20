@@ -18,7 +18,7 @@ From Coq Require Import ssreflect ssrfun ssrbool.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
-
+Set Maximal Implicit Insertion.
 
 Lemma derive_quantified_arrow : forall n s t, derivation [triangle] (quantify_formula n t) -> derivation [triangle] (quantify_formula n (arr s t)).
 Proof.
@@ -408,6 +408,8 @@ apply : interpretation_soundness; eassumption.
 Qed.
 
 
+
+
 Theorem soundness : forall (n : nat) (ΓU ΓS ΓP : list formula), 
   (forall (s : formula), In s ΓU -> represents_nat s) ->
   (forall (s : formula), In s ΓS -> encodes_sum s) ->
@@ -449,11 +451,10 @@ gimme normal_derivation; inversion.
 pose sm' := represent_nat (Datatypes.S m).
 gimme where normal_derivation. move /(_ (get_label sm')).
 (*simplify goal type*)
-have : (instantiate (atom (get_label sm')) 0 (arr (U (var 0)) (arr (S s one (var 0)) (arr (P (var 0) one (var 0)) triangle)))) = 
-(arr (U sm') (arr (S (instantiate sm' 0 s) one sm') (arr (P sm' one sm') triangle))) by reflexivity.
-move => ->.
-rewrite Lc.instantiate_eq0; first assumption.
-move => HD.
+
+
+autorewrite with simplify_formula => ?.
+
 do 3 (gimme normal_derivation; inversion).
 gimme normal_derivation. move /(normal_weakening (Δ := (ΓI ds ++ (U sm' :: ΓU) ++ (S s one sm' :: ΓS) ++ (P sm' one sm' :: ΓP)))).
 move /(_ ltac:(clear; list_inclusion)).
@@ -494,12 +495,13 @@ constructor.
 exists (fun x => epsilon (inhabits 0) (fun m => interpretation (f x) (1+m))).
 apply Forall_forall.
 
-move => d H_d.
-gimme Forall => HD.
-apply Forall_tl in HD.
-rewrite H_f in HD.
-eapply Forall_flat_map in HD; try eassumption.
-case : d HD H_d; cbn; intros.
+move => d.
+gimme Forall; move /Forall_tl.
+gimme @eq where tl. move => ->.
+
+move /Forall_flat_map.
+move //.
+case : d; cbn; intros.
 
 1-3 : decompose_Forall.
 1-3 : do ? decompose_USP.
