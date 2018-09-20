@@ -80,6 +80,14 @@ intros until 0; elim => //.
 intros; gimme well_formed_environment; by inversion.
 Qed.
 
+Lemma f_derivation_wff : forall (Γ : environment) (M : term) (t : formula), 
+  f_derivation Γ M t -> well_formed_formula t.
+Proof.
+intros until 0; elim => //.
+(*should be doable*)
+Admitted.
+
+
 Inductive derivation2 : nat -> environment -> term -> formula → Prop :=
   | ax : forall (n : nat) (Γ : environment) (x : label) (s: formula), 
     In (x, s) Γ -> derivation2 n Γ (free_var x) s
@@ -97,6 +105,7 @@ Inductive partial_chain (s t : formula) : list formula -> Prop :=
   | partial_chain_nil : contains s t -> partial_chain s t List.nil
   | partial_chain_cons : forall (s' t': formula) (ts: list formula), contains s (arr s' t') -> partial_chain t' t ts -> partial_chain s t (s' :: ts).
 
+(*
 Inductive derivation3 : nat -> list formula -> formula → Prop :=
   | ax3 : forall (n : nat) (Γ : list formula) (s t: formula) (ts : list formula), 
     Forall well_formed_formula Γ ->
@@ -119,7 +128,7 @@ intros.
 gimme derivation3; inversion.
 admit.
 Admitted.
-
+*)
 Lemma exists_partial_chain : forall (n : nat) (Γ : environment) (M : term) (t : formula),
   head_form M -> derivation2 n Γ M t -> 
   exists (s : formula) (ts : list formula), 
@@ -308,7 +317,7 @@ intros. apply : IH; try eassumption; omega.
 Qed.
 
 
-(*almost shown, TODO*)
+(*shown*)
 Lemma eta_longness : forall (Γ : list formula) (s t : formula) (ts : list formula), 
   Forall well_formed_formula Γ -> In s Γ -> partial_chain s t ts -> 
   Forall (fun t => exists (n : nat), normal_derivation n Γ t) ts -> exists (n : nat), normal_derivation n Γ t.
@@ -468,50 +477,93 @@ admit. (*easy*)
 
 Admitted.
 
+
+Lemma wfe_wff : forall (Γ : environment), well_formed_environment Γ -> Forall well_formed_formula (map snd Γ).
+Proof.
+elim; cbn.
+
+intros. by constructor.
+
+move => [? s] Γ IH.
+inversion.
+constructor; eauto.
+Qed.
+
+
+Lemma instantiate_bind : forall a b s n, lc n s -> (instantiate (atom b) n (Formula.bind a n s)) = substitute_label a b s.
+Proof.
+move => a b. elim; cbn.
+
+intros. gimme lc. inversion. by inspect_eqb.
+
+move => c ? ?.
+case : (Formula.Label.eqb a c); cbn; by inspect_eqb.
+
+all: intros; gimme lc; inversion; f_equal; eauto.
+Qed.
+
+
+Lemma fresh_formula_label_Forall : forall a Γ, fresh_formula_label a Γ -> Forall (fresh_in a) (map snd Γ).
+Proof.
+move => a. elim.
+intros. constructor.
+
+move => [? s] Γ IH. inversion.
+constructor; eauto.
+Qed.
+
+(*TODO, main lemma*)
 Lemma f_derivation_soundness : forall (Γ : environment) (M : term) (t : formula), 
   f_derivation Γ M t -> normal_form M -> exists (n : nat), normal_derivation n (map snd Γ) t.
 Proof.
 intros until 0; elim; clear.
 
+{ (*case free_var*)
 intros.
-apply : eta_longness2.
-admit. (*easy*)
-have : normal_derivation 0 (map snd Γ) s by admit. apply.
+gimme In. move /(in_map snd). cbn.
+move /eta_longness. apply.
+by apply : wfe_wff.
 do 2 constructor.
 constructor.
+}
 
-apply : eta_longness.
-admit. (*easy*)
-rewrite in_map_iff.
-exists (x, s); split; done.
-do 2 constructor.
-constructor.
-
-(*case app*)
+{ (*case app*)
 intros; gimme normal_form; inversion; gimme head_form; inversion.
 admit.
+}
 
-(*case abs*)
+{ (*case abs*)
 intros; gimme normal_form; inversion.
 gimme head_form; inversion.
 gimme normal_form. move /bind_normal.
 gimme where normal_derivation. move //.
 move => [?]; cbn => ?.
 eexists; apply : derive_arr; eassumption.
+}
 
-(*case inst*)
+{(*case inst*)
 intros.
 gimme where normal_derivation. move /(_ ltac:(assumption)) => [? ?].
 apply : eta_longness2. (*only contains is used*)
 admit.
 eassumption.
-by constructor.
-by constructor.
+admit.
+admit.
+admit.
+}
 
+{ (*case gen*)
 intros.
-gimme where normal_derivation. move /(_ ltac:(assumption)) => [n ?].
-exists n.
-admit. (*use freshness*)
+apply : normal_derivation_exists_quant => b.
+rewrite instantiate_bind.
+gimme f_derivation. move /f_derivation_wff.
+by inversion.
+
+gimme where normal_derivation. nip; first auto.
+move => [n]. move /(substitute_normal_derivation a b).
+rewrite <- map_substitute_fresh_label; last by apply fresh_formula_label_Forall.
+eauto.
+}
 Qed.
 
 head_form M

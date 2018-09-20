@@ -67,6 +67,7 @@ Definition get_label (s : formula) : label :=
   | _ => (0,0) (*to be replaced by some inhabitant of label or make function partial*)
   end.
 
+(*replace occurrences of a by b in t*)
 Fixpoint substitute_label (a b : label) (t : formula) : formula :=
   match t with
     | (atom c) => if Label.eqb a c then (atom b) else t
