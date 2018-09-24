@@ -25,6 +25,9 @@ Tactic Notation "move" "//" :=
     | [|- forall _, _] => let a := fresh in move => a; move : (H a); (try clear a)
   end; clear H.
 
+Tactic Notation "move" "\\" :=
+  let H1 := fresh in let H2 := fresh in move => H1 H2; move : H2 H1; move //.
+
 
 (*additional lemmas*)
 Lemma lc_bind : forall (M : term) (n : nat) (x : label), Term.lc n M -> Term.lc (S n) (Term.bind x n M).
@@ -290,13 +293,19 @@ nip; first auto. inversion. gimme lc. inversion.
 by constructor.
 Qed.
 
-Lemma partial_chain_atom : forall a ts s, partial_chain s (atom a) ts -> chain s a ts.
+Lemma partial_chain_atom : forall a ts s, partial_chain s (atom a) ts <-> chain s a ts.
 Proof.
 move => a; elim.
-intros until 0. inversion. by constructor.
+intros until 0.
+split; inversion; by constructor.
 
 move => t ts IH s.
-inversion. apply : chain_cons; eauto.
+split.
+inversion. apply : chain_cons.
+eassumption. by rewrite <- IH.
+
+inversion. apply : partial_chain_cons.
+eassumption. by rewrite -> IH.
 Qed.
 
 Lemma relax_depth_normal_derivation : forall (n m : nat) (Γ : list formula) (s : formula), 
@@ -483,9 +492,10 @@ intros. cbn. apply : partial_chain_cons; last eassumption.
 gimme contains. by apply /substitute_contains.
 Qed.
 
+
 (*MOST IMPORTANT LEMMA, old substitute_normal_derivation is only on label basis*)
 Lemma substitute_normal_derivation2 : forall (a : label) (s : formula), lc 0 s -> forall (n : nat) (Γ : list formula) (t : formula), 
-  normal_derivation n Γ t -> ∃ n : nat, normal_derivation n (map (substitute a s) Γ) (substitute a s t).
+  normal_derivation n Γ t -> well_formed_formula t -> Forall well_formed_formula Γ -> ∃ n : nat, normal_derivation n (map (substitute a s) Γ) (substitute a s t).
 Proof.
 move => a s ?.
 elim /lt_wf_ind; cbn.
@@ -494,7 +504,11 @@ gimme normal_derivation; inversion.
 
 {
 gimme normal_derivation; move /IH.
-move /(_ ltac:(omega)) => [n ?].
+move /(_ ltac:(omega)).
+gimme well_formed_formula. inversion. gimme lc. inversion.
+nip. by constructor.
+nip. by constructor.
+move => [n ?].
 exists (S n). cbn. by constructor.
 }
 
@@ -507,17 +521,31 @@ case : (Label.eq_dec b a).
 admit. (*unwieldy, but possible, maybe need freshness?*)
 gimme lc.
 move /instantiate_substitution_neq. move //. move => ->.
-apply : IH; try eassumption; omega.
+apply : IH; try eassumption. omega.
+constructor. apply : Lc.instantiate_pred.
+gimme well_formed_formula. inversion. gimme lc. by inversion.
+by constructor.
 }
 
 {
 cbn.
 match goal with [_ : chain _ ?a' _ |- _] => rename a' into b end.
-case : (Label.eq_dec a b).
-intro. subst. rewrite eqb_eq'; first done.
-(*needs partial chain derivations*)
-admit. (*???*)
 
+gimme chain. move /partial_chain_atom.
+move /substitute_partial_chain. gimme lc. move => H'. move : (H'). move \\. move /(_ a).
+move /eta_longness. move /(_ (map (substitute a s) Γ)).
+nip. gimme Forall where well_formed_formula. rewrite ? Forall_forall. move => ?.
+move => u. rewrite in_map_iff. move => [u' [?]]. subst.
+gimme where well_formed_formula. move //.
+inversion. constructor. by apply lc_substitute.
+nip. apply in_map_iff. eexists. eauto.
+nip. gimme Forall where normal_derivation. rewrite ? Forall_forall.
+move => ? u. rewrite in_map_iff. move => [? [?]]. subst.
+gimme where In. move //. move /IH. nip. omega.
+nip. admit. (*show chain_wff, easy*)
+nip.
+all: done.
+}
 Admitted.
 
 Lemma prerequisive : forall (n : nat) (Γ : list formula) (s t : formula), Forall well_formed_formula Γ -> well_formed_formula (quant s) -> 
