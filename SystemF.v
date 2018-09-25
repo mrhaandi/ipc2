@@ -640,7 +640,6 @@ all: done.
 }
 Qed.
 
-Print Assumptions substitute_normal_derivation2.
 
 Lemma prerequisive : forall (n : nat) (Γ : list formula) (s t : formula), Forall well_formed_formula Γ -> well_formed_formula (quant s) -> 
   normal_derivation n Γ (quant s) -> 
@@ -655,6 +654,40 @@ revert dependent a => a.
 revert dependent Γ.
 
 Admitted.
+
+Lemma instantiate_wff : forall s t, lc 0 s -> well_formed_formula (quant t) -> well_formed_formula (instantiate s 0 t).
+Proof.
+intros. constructor.
+gimme well_formed_formula. inversion.
+gimme lc. inversion. apply : Lc.instantiate_pred => //.
+Qed.
+
+
+Lemma substitute_fresh : forall a s t, fresh_in a t -> substitute a s t = t.
+Proof.
+intros until 0. elim : t; cbn => //.
+move => b. inversion. by rewrite -> Label.neq_neqb.
+intros. gimme fresh_in where arr. inversion. f_equal; auto.
+intros. gimme fresh_in where quant. inversion. f_equal; auto.
+Qed.
+
+
+Lemma map_substitute_fresh : forall a s Γ, Forall (fresh_in a) Γ -> (map (substitute a s) Γ) = Γ.
+Proof.
+intros until 0. elim : Γ; cbn => //.
+move => t Γ IH. inversion. f_equal; last auto.
+by apply substitute_fresh.
+Qed.
+
+Lemma substitute_instantiate_atom : forall a s n t, 
+  fresh_in a t -> lc 0 s -> substitute a s (instantiate (atom a) n t) = instantiate s n t.
+Proof.
+intros.
+rewrite substitute_instantiation2 => //=.
+rewrite eqb_eq' => //.
+rewrite substitute_fresh => //.
+Qed.
+
 
 (*key lemma*)
 Lemma eta_longness2 : forall (m n : nat) (Γ : list formula) (s t : formula), 
@@ -671,18 +704,19 @@ have [a ?] := exists_fresh (u :: Γ).
 decompose_Forall.
 gimme where normal_derivation. move /(_ a).
 
-gimme contains_depth; move /IH.
-nip; first omega.
+move /substitute_normal_derivation2. gimme (lc). move \\.
+move /(_ a).
+nip. apply : instantiate_wff => //. by constructor.
+nip. auto.
+move => [n'].
+rewrite map_substitute_fresh => //.
+rewrite substitute_instantiate_atom => //.
+move /IH. gimme contains_depth. move \\.
+nip. omega.
+
 apply; try eassumption.
-
-constructor.
-apply : Lc.instantiate_pred => //.
-gimme well_formed_formula where quant. inversion.
-gimme lc. inversion. assumption.
-
-admit. (*easy*)
-
-Admitted.
+apply : instantiate_wff => //.
+Qed.
 
 
 Lemma wfe_wff : forall (Γ : environment), well_formed_environment Γ -> Forall well_formed_formula (map snd Γ).
