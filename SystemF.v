@@ -688,16 +688,15 @@ rewrite eqb_eq' => //.
 rewrite substitute_fresh => //.
 Qed.
 
-
 (*key lemma*)
-Lemma eta_longness2 : forall (m n : nat) (Γ : list formula) (s t : formula), 
-  Forall well_formed_formula Γ -> well_formed_formula s -> well_formed_formula t -> normal_derivation n Γ s -> contains_depth m s t -> 
+Lemma eta_longness2 : forall (n : nat) (Γ : list formula) (s t : formula), contains s t -> 
+  Forall well_formed_formula Γ -> well_formed_formula s -> well_formed_formula t -> normal_derivation n Γ s -> 
   exists (n : nat), normal_derivation n Γ t.
 Proof.
-elim /lt_wf_ind.
-move => m IH.
-intros; gimme contains_depth; inversion.
+intros until 0 => H. elim : H n.
 eauto.
+
+move => s' t' u ? ? IH *.
 
 gimme normal_derivation; inversion.
 have [a ?] := exists_fresh (u :: Γ).
@@ -711,10 +710,20 @@ nip. auto.
 move => [n'].
 rewrite map_substitute_fresh => //.
 rewrite substitute_instantiate_atom => //.
-move /IH. gimme contains_depth. move \\.
-nip. omega.
+move /IH.
 
 apply; try eassumption.
+apply : instantiate_wff => //.
+Qed.
+
+
+Lemma normal_derive_instantiation : forall s t Γ n, 
+  Forall well_formed_formula Γ -> lc 0 s -> lc 0 (quant t) -> normal_derivation n Γ (quant t) -> exists (n : nat), normal_derivation n Γ (instantiate s 0 t).
+Proof.
+intros.
+apply : eta_longness2; try eassumption.
+apply : contains_trans; last constructor; done.
+by constructor.
 apply : instantiate_wff => //.
 Qed.
 
@@ -793,12 +802,18 @@ eexists; apply : derive_arr; eassumption.
 {(*case inst*)
 intros.
 gimme where normal_derivation. move /(_ ltac:(assumption)) => [? ?].
-apply : eta_longness2. (*only contains is used*)
-admit.
-eassumption.
-admit.
-admit.
-admit.
+apply : eta_longness2; last eassumption.
+
+apply : contains_trans; last constructor.
+gimme well_formed_formula. by inversion.
+
+apply : wfe_wff. apply : f_derivation_wfe; eassumption.
+
+apply : f_derivation_wff; eassumption.
+
+apply : instantiate_wff.
+gimme well_formed_formula. by inversion.
+apply : f_derivation_wff; eassumption.
 }
 
 { (*case gen*)
