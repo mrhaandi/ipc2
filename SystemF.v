@@ -273,11 +273,16 @@ apply : partial_chain_cons; try eassumption.
 by apply IH.
 Qed.
 
-Lemma contains_wff : forall s t, well_formed_formula s -> contains s t -> well_formed_formula t.
+Lemma contains_wff : forall s t, contains s t -> well_formed_formula s -> well_formed_formula t.
 Proof.
-(*doable*)
-Admitted.
+intros until 0. elim.
+auto.
 
+intros. gimme well_formed_formula where quant. inversion. gimme lc. inversion.
+
+intros. gimme where well_formed_formula. apply. constructor.
+gimme lc. move /Lc.instantiate_pred. by apply. 
+Qed.
 
 Lemma partial_chain_wff : forall ts s t, well_formed_formula s -> partial_chain s t ts -> well_formed_formula t.
 Proof.
@@ -292,6 +297,29 @@ gimme contains. move /contains_wff.
 nip; first auto. inversion. gimme lc. inversion.
 by constructor.
 Qed.
+
+Lemma partial_chain_param_wff : forall ts s t u, well_formed_formula s -> partial_chain s t ts -> In u ts -> well_formed_formula u.
+Proof.
+elim.
+intros. gimme In. inversion.
+
+move => t' ts IH.
+intros. gimme partial_chain. inversion.
+gimme In. case.
+
+intro. subst.
+gimme contains. move /contains_wff.
+nip; first auto. inversion. gimme lc. inversion.
+by constructor.
+
+gimme partial_chain.
+move /IH. move //. apply.
+gimme contains. move /contains_wff.
+nip; first auto. inversion. gimme lc. inversion.
+by constructor.
+Qed.
+
+
 
 Lemma partial_chain_atom : forall a ts s, partial_chain s (atom a) ts <-> chain s a ts.
 Proof.
@@ -446,11 +474,20 @@ by rewrite Lc.instantiate_eq0.
 all : intros; f_equal; eauto.
 Qed.
 
-Lemma instantiate_substitution_neq : forall (s t : formula) (a b : label) (n : nat), 
+
+Lemma instantiate_substitution_neq : forall (a b : label) (s t : formula) (n : nat), 
   a <> b -> lc 0 s ->
   (instantiate (atom a) n (substitute b s t)) = substitute b s (instantiate (atom a) n t).
 Proof.
-Admitted.
+intros. elim : t n; cbn.
+move => n m. case : (m =? n); cbn => //.
+rewrite -> Label.neq_neqb; auto.
+
+move => c n. case : (Label.eqb b c); cbn => //.
+by apply Lc.instantiate_eq0.
+
+all: intros; f_equal; auto.
+Qed.
 
 
 Lemma lc_substitute : forall a s t n, lc n s -> lc n t -> lc n (substitute a s t).
@@ -492,6 +529,53 @@ intros. cbn. apply : partial_chain_cons; last eassumption.
 gimme contains. by apply /substitute_contains.
 Qed.
 
+(*the usual presentation of intro_quant*)
+Lemma normal_intro_quant_fresh : forall (s: formula) (Γ : list formula) (a : label) (n : nat), 
+  Forall (fresh_in a) Γ -> fresh_in a s ->
+  normal_derivation n Γ (instantiate (atom a) 0 s) -> normal_derivation (S n) Γ (Formula.quant s).
+Proof.
+move => s Γ a n H *.
+constructor => b.
+gimme normal_derivation. move /(substitute_normal_derivation a b).
+rewrite rename_instantiation. done.
+rewrite <- map_substitute_fresh_label.
+apply. done.
+Qed.
+
+Lemma normal_intro_quant_fresh_exists : forall (s: formula) (Γ : list formula) (a : label), 
+  Forall (fresh_in a) Γ -> fresh_in a s ->
+  (exists (n : nat), normal_derivation n Γ (instantiate (atom a) 0 s)) -> exists (n : nat), normal_derivation (S n) Γ (Formula.quant s).
+Proof.
+firstorder (eauto using normal_intro_quant_fresh).
+Qed.
+
+
+Lemma fresh_in_substitute : forall a b s t, fresh_in a s -> fresh_in a t -> fresh_in a (substitute b s t).
+Proof.
+move => a b s. elim; cbn.
+
+intros. constructor.
+
+move => c *. by case : (Label.eqb b c).
+
+intros. gimme fresh_in where arr. inversion. constructor; auto.
+
+intros. gimme fresh_in where quant. inversion. constructor; auto.
+Qed.
+
+(*reverts assumption with head p*)
+Tactic Notation "gimme" "(" constr(p) ")" :=
+  lazymatch goal with 
+  | [ H : p _ _ _ _ _ _ _  |- _] => move : (H)
+  | [ H : p _ _ _ _ _ _  |- _] => move : (H)
+  | [ H : p _ _ _ _ _  |- _] => move : (H)
+  | [ H : p _ _ _ _  |- _] => move : (H)
+  | [ H : p _ _ _  |- _] => move : (H)
+  | [ H : p _ _  |- _] => move : (H)
+  | [ H : p _  |- _] => move : (H)
+  | [ H : p  |- _] => move : (H)
+  end.
+
 
 (*MOST IMPORTANT LEMMA, old substitute_normal_derivation is only on label basis*)
 Lemma substitute_normal_derivation2 : forall (a : label) (s : formula), lc 0 s -> forall (n : nat) (Γ : list formula) (t : formula), 
@@ -513,25 +597,30 @@ exists (S n). cbn. by constructor.
 }
 
 {
-cbn. apply normal_derivation_exists_quant.
-gimme where normal_derivation. move //.
-intro.
-match goal with [_ : normal_derivation _ _ (instantiate (atom ?b') _ _) |- _] => rename b' into b end.
-case : (Label.eq_dec b a).
-admit. (*unwieldy, but possible, maybe need freshness?*)
-gimme lc.
-move /instantiate_substitution_neq. move //. move => ->.
-apply : IH; try eassumption. omega.
-constructor. apply : Lc.instantiate_pred.
-gimme well_formed_formula. inversion. gimme lc. by inversion.
-by constructor.
+cbn.
+match goal with [_ : well_formed_formula (quant ?s) |- _] => rename s into s' end.
+have [b ?] := exists_fresh ((atom a) :: s' :: s :: Γ).
+decompose_Forall.
+gimme where normal_derivation. move /(_ b).
+move /IH. nip. omega.
+nip. constructor. gimme well_formed_formula. inversion. gimme lc. inversion.
+apply : Lc.instantiate_pred. done. constructor.
+nip. auto.
+gimme fresh_in where atom. inversion.
+rewrite <- instantiate_substitution_neq => //.
+move => [n ?].
+exists (S n). apply : (normal_intro_quant_fresh (a := b)) => //.
+
+gimme Forall. rewrite ? Forall_forall. move => ? ?.
+rewrite in_map_iff. move => [u [?]]. subst.
+gimme where In. move //. by apply /fresh_in_substitute.
+by apply : fresh_in_substitute.
 }
 
 {
 cbn.
-match goal with [_ : chain _ ?a' _ |- _] => rename a' into b end.
-
-gimme chain. move /partial_chain_atom.
+match goal with [_ : chain ?s ?a ?ts |- _] => rename a into b; rename s into s'; rename ts into params end.
+gimme (chain). move /partial_chain_atom.
 move /substitute_partial_chain. gimme lc. move => H'. move : (H'). move \\. move /(_ a).
 move /eta_longness. move /(_ (map (substitute a s) Γ)).
 nip. gimme Forall where well_formed_formula. rewrite ? Forall_forall. move => ?.
@@ -540,13 +629,18 @@ gimme where well_formed_formula. move //.
 inversion. constructor. by apply lc_substitute.
 nip. apply in_map_iff. eexists. eauto.
 nip. gimme Forall where normal_derivation. rewrite ? Forall_forall.
-move => ? u. rewrite in_map_iff. move => [? [?]]. subst.
-gimme where In. move //. move /IH. nip. omega.
-nip. admit. (*show chain_wff, easy*)
+move => ? u. rewrite in_map_iff. move => [? [? ?]]. subst.
+gimme (In). gimme where normal_derivation. move //. move /IH. nip. omega.
+nip.
+gimme (chain). move /partial_chain_atom. move /partial_chain_param_wff.
+apply => //.
+gimme Forall. rewrite Forall_forall. by apply.
 nip.
 all: done.
 }
-Admitted.
+Qed.
+
+Print Assumptions substitute_normal_derivation2.
 
 Lemma prerequisive : forall (n : nat) (Γ : list formula) (s t : formula), Forall well_formed_formula Γ -> well_formed_formula (quant s) -> 
   normal_derivation n Γ (quant s) -> 
