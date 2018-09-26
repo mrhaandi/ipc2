@@ -770,7 +770,7 @@ move => [? s] Γ IH. inversion.
 constructor; eauto.
 Qed.
 
-
+(*
 Lemma substitute_generalizes : forall a s Γ t u, 
   Forall (fresh_in a) Γ -> not (fresh_in a u) -> generalizes Γ t u -> generalizes Γ (substitute a s t) (substitute a s u).
 Proof.
@@ -778,6 +778,7 @@ intros. gimme not. gimme generalizes. elim.
 constructor.
 intros. cbn. (*apply : generalizes_step., needs more freshness?*)
 Admitted.
+*)
 
 Fixpoint term_size (M : term) : nat :=
   match M with
@@ -793,6 +794,46 @@ intros until 0. elim; cbn; intros => //.
 constructor.
 admit. (*easy*)
 Admitted.
+
+
+Lemma substitute_bind_eq : forall a s t n, substitute a s (Formula.bind a n t) = Formula.bind a n t.
+Proof.
+Admitted.
+
+(*
+Lemma substitute_bind_fresh (c : label) : forall a b s t n, 
+  fresh_in c s -> fresh_in c t -> substitute a s (Formula.bind b n t) = Formula.bind c n (substitute a s (substitute_label b c t)).
+Proof.
+Admitted.
+*)
+
+Lemma substitute_bind_fresh : forall a b s t n, 
+  fresh_in b s -> substitute a s (Formula.bind b n t) = Formula.bind b n (substitute a s t).
+Proof.
+Admitted.
+
+
+Lemma substitute_generalizes : forall Γ a u s t, 
+  generalizes (u :: Γ) s t -> generalizes (u :: Γ) s (substitute a u t) \/ generalizes (u :: Γ) (substitute a u s) (substitute a u t).
+Proof.
+intros until 0. elim.
+right. constructor.
+
+move => b u'. intros.
+cbn.
+case : (Label.eq_dec a b); intro.
+
+subst. left. rewrite substitute_bind_eq. by constructor.
+
+decompose_Forall.
+gimme or. case; intro.
+
+left. rewrite substitute_bind_fresh => //.
+constructor => //. by constructor.
+
+right. rewrite substitute_bind_fresh => //.
+constructor => //. by constructor.
+Qed.
 
 
 Lemma f_head_generalized_chain : forall M Γ t, f_derivation Γ M t -> head_form M -> 
@@ -838,6 +879,8 @@ apply : partial_chain_wff; last eassumption.
 gimme f_derivation. move /f_derivation_wfe /wfe_wff.
 rewrite Forall_forall. move /(_ s'). rewrite in_map_iff. apply.
 firstorder done.
+
+(*need to to distinguish by freshness*)
 
 exists x, (substitute a t0 s'), (substitute a t0 u), (map (substitute a t0) ts).
 split. admit. (*easy*)
@@ -1007,3 +1050,5 @@ rewrite <- map_substitute_fresh_label; last by apply fresh_formula_label_Forall.
 eauto.
 }
 Qed.
+
+Print Assumptions f_derivation_soundness.
