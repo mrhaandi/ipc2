@@ -2,6 +2,7 @@ Require Import Utf8.
 
 Require Import FormulaFacts.
 Require Import List.
+Require Import Psatz.
 Require Import Omega.
 Import ListNotations.
 Require Import ListFacts.
@@ -45,8 +46,7 @@ Definition fresh_formula_label (a : label) (Γ : environment) := Forall (fun '(_
 
 
 (*s is well formed, if it contains no unbound De Bruijn indices*)
-Inductive well_formed_formula (s : formula) : Prop :=
-  | wff_lc : lc 0 s -> well_formed_formula s.
+Definition well_formed_formula (s : formula) : Prop := lc 0 s.
 
 (*Γ is well formed, if any term variable appears at most once*)
 Inductive well_formed_environment : environment -> Prop :=
@@ -55,8 +55,7 @@ Inductive well_formed_environment : environment -> Prop :=
     well_formed_formula s -> well_formed_environment Γ -> fresh_term_label x Γ -> well_formed_environment ((x, s) :: Γ).
 
 (*M is well formed, if it contains no unbound De Bruijn indices*)
-Inductive well_formed_term (M : term) : Prop :=
-  | wft_lc : Term.lc 0 M -> well_formed_term M.
+Definition well_formed_term (M : term) : Prop := Term.lc 0 M .
 
 
 Inductive f_derivation (Γ: environment) : term -> formula -> Prop :=
@@ -81,23 +80,63 @@ intros; do ? constructor.
 
 intros; do 2 (gimme well_formed_term; inversion); by do 2 constructor.
 
-intros; gimme well_formed_term; inversion; do 2 constructor.
-by apply : lc_bind.
+intros; gimme well_formed_term; inversion; constructor.
+all: by apply : lc_bind; constructor.
 Qed.
 
-Lemma f_derivation_wfe : forall (Γ : environment) (M : term) (t : formula), 
+Lemma f_derivation_wfe : forall (Γ : environment) (M : term) (t : formula),
   f_derivation Γ M t -> well_formed_environment Γ.
 Proof.
 intros until 0; elim => //.
 intros; gimme well_formed_environment; by inversion.
 Qed.
 
+Lemma wfe_wff : forall (Γ : environment), well_formed_environment Γ -> Forall well_formed_formula (map snd Γ).
+Proof.
+elim; cbn.
+
+intros. by constructor.
+
+move => [? s] Γ IH.
+inversion.
+constructor; eauto.
+Qed.
+
+Lemma in_wfe_wff : forall x s Γ, well_formed_environment Γ -> In (x, s) Γ -> well_formed_formula s.
+Proof.
+intros. gimme well_formed_environment. move /wfe_wff.
+rewrite Forall_forall. apply.
+rewrite in_map_iff. firstorder auto.
+Qed.
+
+Lemma lc_bind2 : forall (a : label) (s : formula) (n : nat), lc n s -> lc (S n) (Formula.bind a n s).
+Proof.
+move => a. elim; cbn.
+intros until 0. inversion. constructor. omega.
+
+move => b. intros. case : (Label.eqb a b); constructor. omega.
+
+all: intros; gimme lc; inversion; constructor; eauto.
+Qed.
+
 Lemma f_derivation_wff : forall (Γ : environment) (M : term) (t : formula), 
   f_derivation Γ M t -> well_formed_formula t.
 Proof.
 intros until 0; elim => //.
-(*should be doable*)
-Admitted.
+
+intros. apply : in_wfe_wff; eassumption.
+
+intros. gimme well_formed_formula where arr. by inversion.
+
+intros. constructor => //.
+gimme f_derivation. move /f_derivation_wfe /in_wfe_wff. apply.
+by constructor.
+
+intros. gimme well_formed_formula where quant. inversion.
+by apply Lc.instantiate_pred.
+
+intros. constructor. by apply : lc_bind2.
+Qed.
 
 
 Inductive derivation2 : nat -> environment -> term -> formula → Prop :=
@@ -252,9 +291,9 @@ Proof.
 intros until 0. elim.
 auto.
 
-intros. gimme well_formed_formula where quant. inversion. gimme lc. inversion.
+intros. gimme well_formed_formula where quant. inversion.
 
-intros. gimme where well_formed_formula. apply. constructor.
+intros. gimme where well_formed_formula. apply.
 gimme lc. move /Lc.instantiate_pred. by apply. 
 Qed.
 
@@ -268,8 +307,7 @@ move => u ts IH.
 intros. gimme partial_chain. inversion.
 apply : IH; last eassumption.
 gimme contains. move /contains_wff.
-nip; first auto. inversion. gimme lc. inversion.
-by constructor.
+nip; first auto. by inversion.
 Qed.
 
 Lemma partial_chain_param_wff : forall ts s t u, well_formed_formula s -> partial_chain s t ts -> In u ts -> well_formed_formula u.
@@ -283,14 +321,12 @@ gimme In. case.
 
 intro. subst.
 gimme contains. move /contains_wff.
-nip; first auto. inversion. gimme lc. inversion.
-by constructor.
+nip; first auto. by inversion.
 
 gimme partial_chain.
 move /IH. move //. apply.
 gimme contains. move /contains_wff.
-nip; first auto. inversion. gimme lc. inversion.
-by constructor.
+nip; first auto. by inversion.
 Qed.
 
 
@@ -348,7 +384,7 @@ intros. gimme partial_chain. move /partial_chain_wff.
 nip. 
 gimme In. gimme Forall where well_formed_formula.
 rewrite Forall_forall. by move //.
-inversion. gimme lc. inversion. omega.
+inversion. omega.
 }
 
 {(*case atom*)
@@ -375,7 +411,7 @@ nip.
 gimme In.
 gimme Forall where well_formed_formula.
 rewrite Forall_forall. by move //.
-inversion. gimme lc. inversion. by constructor.
+by inversion.
 
 gimme partial_chain. move /partial_chain_arr.
 
@@ -556,8 +592,8 @@ gimme normal_derivation; inversion.
 {
 gimme normal_derivation; move /IH.
 move /(_ ltac:(omega)).
-gimme well_formed_formula. inversion. gimme lc. inversion.
-nip. by constructor.
+gimme well_formed_formula. inversion.
+nip. done.
 nip. by constructor.
 move => [n ?].
 exists (S n). cbn. by constructor.
@@ -570,7 +606,7 @@ have [b ?] := exists_fresh ((atom a) :: s' :: s :: Γ).
 decompose_Forall.
 gimme where normal_derivation. move /(_ b).
 move /IH. nip. omega.
-nip. constructor. gimme well_formed_formula. inversion. gimme lc. inversion.
+nip. gimme well_formed_formula. inversion.
 apply : Lc.instantiate_pred. done. constructor.
 nip. auto.
 gimme fresh_in where atom. inversion.
@@ -593,7 +629,7 @@ move /eta_longness. move /(_ (map (substitute a s) Γ)).
 nip. gimme Forall where well_formed_formula. rewrite ? Forall_forall. move => ?.
 move => u. rewrite in_map_iff. move => [u' [?]]. subst.
 gimme where well_formed_formula. move //.
-inversion. constructor. by apply lc_substitute.
+by apply lc_substitute.
 nip. apply in_map_iff. eexists. eauto.
 nip. gimme Forall where normal_derivation. rewrite ? Forall_forall.
 move => ? u. rewrite in_map_iff. move => [? [? ?]]. subst.
@@ -607,7 +643,7 @@ all: done.
 }
 Qed.
 
-
+(*
 Lemma prerequisive : forall (n : nat) (Γ : list formula) (s t : formula), Forall well_formed_formula Γ -> well_formed_formula (quant s) -> 
   normal_derivation n Γ (quant s) -> 
   exists n, normal_derivation n Γ (instantiate t 0 s).
@@ -621,12 +657,13 @@ revert dependent a => a.
 revert dependent Γ.
 
 Admitted.
+*)
 
 Lemma instantiate_wff : forall s t, lc 0 s -> well_formed_formula (quant t) -> well_formed_formula (instantiate s 0 t).
 Proof.
-intros. constructor.
+intros. 
 gimme well_formed_formula. inversion.
-gimme lc. inversion. apply : Lc.instantiate_pred => //.
+apply : Lc.instantiate_pred => //.
 Qed.
 
 
@@ -693,21 +730,11 @@ Proof.
 intros.
 apply : eta_longness2; try eassumption.
 apply : contains_trans; last constructor; done.
-by constructor.
 apply : instantiate_wff => //.
 Qed.
 
 
-Lemma wfe_wff : forall (Γ : environment), well_formed_environment Γ -> Forall well_formed_formula (map snd Γ).
-Proof.
-elim; cbn.
 
-intros. by constructor.
-
-move => [? s] Γ IH.
-inversion.
-constructor; eauto.
-Qed.
 
 
 Lemma instantiate_bind : forall a b s n, lc n s -> (instantiate (atom b) n (Formula.bind a n s)) = substitute_label a b s.
@@ -760,6 +787,13 @@ Fixpoint term_size (M : term) : nat :=
   | (term_abs M) => 1 + (term_size M)
   end.
 
+Lemma lc_generalizes : forall Γ s t, generalizes Γ s t -> lc 0 s -> lc 0 t.
+Proof.
+intros until 0. elim; cbn; intros => //.
+constructor.
+admit. (*easy*)
+Admitted.
+
 
 Lemma f_head_generalized_chain : forall M Γ t, f_derivation Γ M t -> head_form M -> 
   exists x s u ts, In (x, s) Γ /\ 
@@ -792,19 +826,24 @@ gimme generalizes. inversion.
 exists x, s', (instantiate t0 0 s), ts.
 split. done.
 split. apply : instantiate_partial_chain2 => //.
-gimme well_formed_formula. by inversion.
 split. constructor.
 done.
 }
 
 {
 rewrite instantiate_bind2.
-admit. (*maybe problematic*)
+
+apply : lc_generalizes; first eassumption.
+apply : partial_chain_wff; last eassumption.
+gimme f_derivation. move /f_derivation_wfe /wfe_wff.
+rewrite Forall_forall. move /(_ s'). rewrite in_map_iff. apply.
+firstorder done.
+
 exists x, (substitute a t0 s'), (substitute a t0 u), (map (substitute a t0) ts).
 split. admit. (*easy*)
 split.
 gimme partial_chain. apply /substitute_partial_chain.
-gimme well_formed_formula. by inversion.
+done.
 split. admit. (*by apply : substitute_generalizes.*)
 gimme Forall where f_derivation. rewrite ? Forall_forall.
 move => ? ?. rewrite in_map_iff. move => [u' [?]]. subst.
@@ -823,6 +862,14 @@ apply : generalizes_step => //.
 by apply : fresh_formula_label_Forall.
 }
 Admitted.
+
+Lemma term_size_bind : forall x M n, term_size (Term.bind x n M) = term_size M.
+Proof.
+move => x. elim; cbn.
+move => y. by case : (Label.eqb x y).
+done.
+all: intros; congruence.
+Qed.
 
 (*
 Lemma generalized_eta_longness : forall (Γ : list formula) (s t : formula) (ts : list formula), 
@@ -902,9 +949,10 @@ nip. done.
 move => [x [s' [t' [ts [? [? [? ?]]]]]]].
 gimme generalizes. inversion.
 gimme partial_chain. move /partial_chain_arr.
-have : In s' (map snd Γ). admit. (*easy*)
+have : In s' (map snd Γ).
+rewrite in_map_iff. firstorder auto.
 move /eta_longness. move //.
-nip. admit.
+nip. gimme f_derivation. move /f_derivation_wfe. apply wfe_wff.
 nip. apply Forall_app. split.
 apply : Forall_impl; last eassumption.
 cbn. firstorder auto. gimme f_derivation. move /IH. 
@@ -925,7 +973,7 @@ gimme normal_form. move /bind_normal.
 gimme where term_size. cbn => ?.
 gimme f_derivation. move /IH. move /(_ _ _ ltac:(reflexivity)).
 move //.
-nip. admit. (*easy*)
+nip. gimme where Term.bind. rewrite term_size_bind. intros. omega.
 move => [? ?].
 eexists. apply : derive_arr; eassumption.
 }
@@ -937,23 +985,20 @@ nip. assumption. nip. assumption.
 move => [? ?].
 apply : eta_longness2; last eassumption.
 
-apply : contains_trans; last constructor.
-gimme well_formed_formula. by inversion.
+apply : contains_trans; last constructor. done.
 
 apply : wfe_wff. apply : f_derivation_wfe; eassumption.
 
 apply : f_derivation_wff; eassumption.
 
-apply : instantiate_wff.
-gimme well_formed_formula. by inversion.
+apply : instantiate_wff. done.
 apply : f_derivation_wff; eassumption.
 }
 
 { (*case gen*)
 apply : normal_derivation_exists_quant => b.
 rewrite instantiate_bind.
-gimme f_derivation. move /f_derivation_wff.
-by inversion.
+gimme f_derivation. apply f_derivation_wff.
 
 gimme where normal_derivation. 
 nip. done. nip. done.
