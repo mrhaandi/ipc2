@@ -46,6 +46,11 @@ rewrite -> (surjective_pairing b); cbn.
 by rewrite <- ? beq_nat_refl.
 Qed.
 
+Lemma eq_eqb : forall (a b : label), a = b -> (eqb a b = true).
+Proof.
+move => [a1 a2] [b1 b2]. case. move => -> ->. cbn.
+by rewrite <- ? beq_nat_refl.
+Qed.
 
 Lemma neqb_neq : forall (a b : label), (eqb a b = false) <-> a <> b.
 Proof.
@@ -57,4 +62,14 @@ case; intro; case; intros; by subst.
 have := Nat.eq_dec a1 b1; have := Nat.eq_dec a2 b2.
 firstorder auto.
 Qed.
+
+Lemma neq_neqb: forall (a b : label), a <> b -> (eqb a b = false).
+Proof.
+move => [a1 a2] [b1 b2]. cbn.
+rewrite andb_false_iff; rewrite ? Nat.eqb_neq.
+
+have := Nat.eq_dec a1 b1; have := Nat.eq_dec a2 b2.
+firstorder auto.
+Qed.
+
 End Label.

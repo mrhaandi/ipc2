@@ -117,63 +117,20 @@ Inductive partial_chain (s t : formula) : list formula -> Prop :=
   | partial_chain_nil : contains s t -> partial_chain s t List.nil
   | partial_chain_cons : forall (s' t': formula) (ts: list formula), contains s (arr s' t') -> partial_chain t' t ts -> partial_chain s t (s' :: ts).
 
-(*
-Inductive derivation3 : nat -> list formula -> formula → Prop :=
-  | ax3 : forall (n : nat) (Γ : list formula) (s t: formula) (ts : list formula), 
-    Forall well_formed_formula Γ ->
-    In s Γ -> partial_chain s t ts -> Forall (derivation3 n Γ) ts ->
-    derivation3 (S n) Γ s
-  | intro_arr3 : forall (n : nat) (Γ : list formula) (s t : formula), 
-    derivation3 n (s :: Γ) t -> derivation3 (S n) Γ (arr s t)
-  | intro_quant3 : forall (n : nat) (Γ : list formula) (s : formula), 
-   (forall (a: label), derivation3 n Γ (instantiate (atom a) 0 s)) -> derivation3 (S n) Γ (quant s).
 
+Inductive generalizes (Γ : list formula) (s : formula) : formula -> Prop :=
+  | generalizes_rfl : generalizes Γ s s
+  | generalizes_step : forall (a : label) (t : formula), 
+    Forall (fresh_in a) Γ -> generalizes Γ s t -> generalizes Γ s (quant (Formula.bind a 0 t)).
 
-Lemma prerequisive : forall (n : nat) (Γ : list formula) (s t : formula), 
-  Forall well_formed_formula Γ -> well_formed_formula (quant s) -> 
-  derivation3 n Γ (quant s) -> 
-  exists n, normal_derivation n Γ (instantiate t 0 s).
-Proof.
-elim /lt_wf_ind.
-move => n IH.
-intros.
-gimme derivation3; inversion.
-admit.
-Admitted.
-*)
-Lemma exists_partial_chain : forall (n : nat) (Γ : environment) (M : term) (t : formula),
-  head_form M -> derivation2 n Γ M t -> 
-  exists (s : formula) (ts : list formula), 
-    In s (map snd Γ) /\ 
-    partial_chain s t ts /\ 
-    Forall (fun t => exists (n : nat) (M : term), derivation2 n Γ M t) ts.
-Proof.
-intros until 0 => H.
-move : n Γ t.
-elim : H.
-
-admit. (*probably induction*)
-
-
-
-
-{ (*case x*)
-intros until 0; inversion.
-eexists; exists [].
-do_last 2 split.
-rewrite in_map_iff.
-eauto.
-do 2 constructor.
-constructor.
-
-
-
-Qed.
-
-
-
-
-
+Inductive generalized_chain (Γ : list formula) (s : formula) : formula -> list formula -> Prop :=
+  | generalized_chain_nil : generalized_chain Γ s s List.nil
+  | generalized_chain_app : forall (t u : formula) (ts : list formula), 
+    generalized_chain Γ s (arr t u) ts -> generalized_chain Γ s u (t :: ts)
+  | generalized_chain_gen : forall (a : label) (t : formula) (ts : list formula), 
+    Forall (fresh_in a) Γ -> generalized_chain Γ s t ts -> generalized_chain Γ s (quant (Formula.bind a 0 t)) ts
+  | generalized_chain_inst : forall (t u : formula) (ts : list formula), 
+    lc 0 u -> generalized_chain Γ s (quant t) ts -> generalized_chain Γ s (instantiate u 0 t) ts.
 
 Lemma bind_normal_and_head : forall (x : label) (N : term) (n : nat), 
   (normal_form (Term.bind x n N) -> normal_form N) /\ (head_form (Term.bind x n N) -> head_form N).
@@ -241,6 +198,23 @@ move => s t. inversion. constructor.
 gimme contains. move /contains_transitivity.
 apply.
 apply : contains_trans; last constructor. constructor.
+
+move => t ts IH.
+move => s' t'. inversion.
+apply : partial_chain_cons; first eassumption.
+by apply : IH.
+Qed.
+
+
+Lemma instantiate_partial_chain2 : forall s t u ts, lc 0 u -> partial_chain s (quant t) ts -> partial_chain s (instantiate u 0 t) ts.
+Proof.
+intros until 0 => ?.
+elim : ts s t.
+
+move => s t. inversion. constructor.
+gimme contains. move /contains_transitivity.
+apply.
+apply : contains_trans; last constructor. done.
 
 move => t ts IH.
 move => s' t'. inversion.
@@ -359,7 +333,6 @@ intros. apply : IH; try eassumption; omega.
 Qed.
 
 
-(*shown*)
 Lemma eta_longness : forall (Γ : list formula) (s t : formula) (ts : list formula), 
   Forall well_formed_formula Γ -> In s Γ -> partial_chain s t ts -> 
   Forall (fun t => exists (n : nat), normal_derivation n Γ t) ts -> exists (n : nat), normal_derivation n Γ t.
@@ -451,12 +424,6 @@ Fixpoint substitute (a : label) (s t : formula) : formula :=
     | (arr s' t') => arr (substitute a s s') (substitute a s t')
     | (quant t') => quant (substitute a s t')
   end.
-
-Lemma eqb_eq' : forall (a b : label), a = b -> (Label.eqb a b = true).
-Proof.
-intros.
-by apply (Label.eqb_eq a b).
-Qed.
 
 Lemma substitute_instantiation2 : forall a u, lc 0 u -> forall t s n, 
   substitute a u (instantiate s n t) = instantiate (substitute a u s) n (substitute a u t).
@@ -684,7 +651,7 @@ Lemma substitute_instantiate_atom : forall a s n t,
 Proof.
 intros.
 rewrite substitute_instantiation2 => //=.
-rewrite eqb_eq' => //.
+rewrite Label.eq_eqb => //.
 rewrite substitute_fresh => //.
 Qed.
 
@@ -717,6 +684,9 @@ apply : instantiate_wff => //.
 Qed.
 
 
+(*Lemma eta_longness3 : normal_derivation n Γ s -> partial_chain s t ts -> (exists (n : nat), Forall (normal_derivation n Γ) ts)  
+*)
+
 Lemma normal_derive_instantiation : forall s t Γ n, 
   Forall well_formed_formula Γ -> lc 0 s -> lc 0 (quant t) -> normal_derivation n Γ (quant t) -> exists (n : nat), normal_derivation n Γ (instantiate s 0 t).
 Proof.
@@ -747,11 +717,22 @@ move => a b. elim; cbn.
 intros. gimme lc. inversion. by inspect_eqb.
 
 move => c ? ?.
-case : (Formula.Label.eqb a c); cbn; by inspect_eqb.
+case : (Label.eqb a c); cbn; by inspect_eqb.
 
 all: intros; gimme lc; inversion; f_equal; eauto.
 Qed.
 
+Lemma instantiate_bind2 : forall a s t n, lc n t -> (instantiate s n (Formula.bind a n t)) = substitute a s t.
+Proof.
+move => a s. elim; cbn.
+
+intros. gimme lc. inversion. by inspect_eqb.
+
+move => b ? ?.
+case : (Label.eqb a b); cbn. by inspect_eqb.
+
+all: intros; gimme lc; inversion; f_equal; eauto.
+Qed.
 
 Lemma fresh_formula_label_Forall : forall a Γ, fresh_formula_label a Γ -> Forall (fresh_in a) (map snd Γ).
 Proof.
@@ -762,21 +743,148 @@ move => [? s] Γ IH. inversion.
 constructor; eauto.
 Qed.
 
-(*
-Lemma letstry : forall M Γ t, head_form M -> f_derivation Γ M t -> exists x s ts, In (x, s) Γ /\ partial_chain s t ts.
-Proof.
-move => M.
-move : (term_depth <)
-*)
 
+Lemma substitute_generalizes : forall a s Γ t u, 
+  Forall (fresh_in a) Γ -> not (fresh_in a u) -> generalizes Γ t u -> generalizes Γ (substitute a s t) (substitute a s u).
+Proof.
+intros. gimme not. gimme generalizes. elim.
+constructor.
+intros. cbn. (*apply : generalizes_step., needs more freshness?*)
+Admitted.
+
+Fixpoint term_size (M : term) : nat :=
+  match M with
+  | (free_var _) => 1
+  | (bound_var _) => 1
+  | (term_app M N) => 1 + (term_size M) + (term_size N)
+  | (term_abs M) => 1 + (term_size M)
+  end.
+
+
+Lemma f_head_generalized_chain : forall M Γ t, f_derivation Γ M t -> head_form M -> 
+  exists x s u ts, In (x, s) Γ /\ 
+    partial_chain s u ts /\ generalizes (map snd Γ) u t /\ 
+    Forall (fun t' => exists (N : term), f_derivation Γ N t' /\ (term_size N) < (term_size M) /\ normal_form N) ts.
+Proof.
+intros until 0. elim.
+
+{
+intros. admit. (*easy*)
+}
+
+{
+intros.
+gimme head_form. inversion.
+admit. (*easy*)
+}
+
+{
+intros. gimme head_form. inversion.
+}
+
+{
+intros.
+gimme where partial_chain. move /(_ ltac:(assumption)).
+move => [x [s' [u [ts [? [? [? ?]]]]]]].
+gimme generalizes. inversion.
+
+{
+exists x, s', (instantiate t0 0 s), ts.
+split. done.
+split. apply : instantiate_partial_chain2 => //.
+gimme well_formed_formula. by inversion.
+split. constructor.
+done.
+}
+
+{
+rewrite instantiate_bind2.
+admit. (*maybe problematic*)
+exists x, (substitute a t0 s'), (substitute a t0 u), (map (substitute a t0) ts).
+split. admit. (*easy*)
+split.
+gimme partial_chain. apply /substitute_partial_chain.
+gimme well_formed_formula. by inversion.
+split. admit. (*by apply : substitute_generalizes.*)
+gimme Forall where f_derivation. rewrite ? Forall_forall.
+move => ? ?. rewrite in_map_iff. move => [u' [?]]. subst.
+gimme where f_derivation. move //. move => [N [? [? ?]]].
+exists N. split => //. admit. (*needs substitute f_derivation*)
+}
+}
+
+{
+intros.
+gimme where partial_chain. move /(_ ltac:(assumption)).
+move => [x [s' [u [ts [? [? [? ?]]]]]]].
+exists x, s', u, ts.
+firstorder auto.
+apply : generalizes_step => //.
+by apply : fresh_formula_label_Forall.
+}
+Admitted.
+
+(*
+Lemma generalized_eta_longness : forall (Γ : list formula) (s t : formula) (ts : list formula), 
+  generalized_chain Γ s t ts -> Forall well_formed_formula Γ -> In s Γ -> 
+  Forall (fun t => exists (n : nat), normal_derivation n Γ t) ts -> exists (n : nat), normal_derivation n Γ t.
+Proof.
+move => Γ s t. move Hn : (formula_size t) => n.
+elim /lt_wf_ind : n Γ s t Hn.
+move => n IH. move => Γ s t. case : t.
+Admitted. (*???*)
+
+
+Lemma f_head_generalized_chain : forall M Γ t, f_derivation Γ M t -> head_form M -> 
+  exists x s u ts, In (x, s) Γ /\ generalized_chain (map snd Γ) s t ts.
+Proof.
+intros until 0.
+elim.
+admit. (*easy*)
+
+intros. admit. (*easy*)
+
+{ (*case abs*)
+intros. gimme head_form. inversion.
+}
+
+{ (*case inst*)
+intros. gimme where and. 
+nip. auto.
+move => [x [u [ts [? ?]]]].
+exists x, u, ts.
+split. done.
+apply : generalized_chain_inst => //.
+gimme well_formed_formula. by inversion.
+}
+
+{ (*case gen*)
+intros.
+gimme where and. 
+nip. auto.
+move => [x [u [ts [? ?]]]].
+exists x, u, ts.
+split. done.
+apply : generalized_chain_gen => //.
+gimme fresh_formula_label. rewrite /fresh_formula_label.
+rewrite ? Forall_forall.
+intros. gimme In. rewrite in_map_iff. move => [[? ?] [?]].
+gimme where fresh_in. move //. by subst.
+}
+Admitted.
+*)
 (*TODO, main lemma*)
 Lemma f_derivation_soundness : forall (Γ : environment) (M : term) (t : formula), 
   f_derivation Γ M t -> normal_form M -> exists (n : nat), normal_derivation n (map snd Γ) t.
 Proof.
-intros until 0; elim; clear.
+move => Γ M t H.
+move Hm : (term_size M) => m.
+elim /lt_wf_ind : m Γ M t H Hm.
+move => m IH.
+intros until 0. elim; clear Γ M t; intros.
+
 
 { (*case free_var*)
-intros.
 gimme In. move /(in_map snd). cbn.
 move /eta_longness. apply.
 by apply : wfe_wff.
@@ -785,23 +893,48 @@ constructor.
 }
 
 { (*case app*)
-intros. gimme normal_form. inversion.
-gimme head_form. inversion. 
-admit.
+gimme normal_form. inversion.
+gimme head_form. inversion.
+gimme where term_size. cbn => ?.
+gimme f_derivation where arr.
+move /f_head_generalized_chain.
+nip. done.
+move => [x [s' [t' [ts [? [? [? ?]]]]]]].
+gimme generalizes. inversion.
+gimme partial_chain. move /partial_chain_arr.
+have : In s' (map snd Γ). admit. (*easy*)
+move /eta_longness. move //.
+nip. admit.
+nip. apply Forall_app. split.
+apply : Forall_impl; last eassumption.
+cbn. firstorder auto. gimme f_derivation. move /IH. 
+move /(_ _ _ ltac:(reflexivity)). apply.
+omega. done.
+constructor; last constructor.
+
+gimme f_derivation. move /IH. move /(_ _ _ ltac:(reflexivity)).
+apply. omega. done.
+
+apply.
 }
 
 { (*case abs*)
-intros; gimme normal_form; inversion.
+gimme normal_form; inversion.
 gimme head_form; inversion.
 gimme normal_form. move /bind_normal.
-gimme where normal_derivation. move //.
-move => [?]; cbn => ?.
-eexists; apply : derive_arr; eassumption.
+gimme where term_size. cbn => ?.
+gimme f_derivation. move /IH. move /(_ _ _ ltac:(reflexivity)).
+move //.
+nip. admit. (*easy*)
+move => [? ?].
+eexists. apply : derive_arr; eassumption.
 }
 
-{(*case inst*)
-intros.
-gimme where normal_derivation. move /(_ ltac:(assumption)) => [? ?].
+{
+(*case inst*)
+gimme where normal_derivation.
+nip. assumption. nip. assumption.
+move => [? ?].
 apply : eta_longness2; last eassumption.
 
 apply : contains_trans; last constructor.
@@ -817,13 +950,13 @@ apply : f_derivation_wff; eassumption.
 }
 
 { (*case gen*)
-intros.
 apply : normal_derivation_exists_quant => b.
 rewrite instantiate_bind.
 gimme f_derivation. move /f_derivation_wff.
 by inversion.
 
-gimme where normal_derivation. nip; first auto.
+gimme where normal_derivation. 
+nip. done. nip. done.
 move => [n]. move /(substitute_normal_derivation a b).
 rewrite <- map_substitute_fresh_label; last by apply fresh_formula_label_Forall.
 eauto.

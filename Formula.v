@@ -2,13 +2,14 @@ Require Import Utf8.
 
 Require Import Omega.
 Require Import Bool.
-
+Require Export Label.
 
 From Coq Require Import ssreflect ssrfun ssrbool.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
+(*
 (*used for free variables*)
 Definition label : Set := nat * nat.
 
@@ -52,7 +53,7 @@ all : match goal with [H : _ <> _ |- _] => move /Nat.eqb_neq : H => -> end.
 all : auto using Bool.andb_false_r.
 Qed.
 End Label.
-
+*)
 
 Inductive formula : Set :=
     | var : nat -> formula
