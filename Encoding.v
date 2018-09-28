@@ -1,18 +1,10 @@
-Require Import Utf8.
+Load Common.
+
 Require Import FormulaFacts.
-Require Import Omega.
 Require Import Psatz. (*lia : linear integer arithmetic*)
-Require Import List.
-Import ListNotations.
 Require Import Derivations.
 Require Import Diophantine.
 Require Import UserTactics.
-
-
-From Coq Require Import ssreflect ssrfun ssrbool.
-Set Implicit Arguments.
-Unset Strict Implicit.
-Unset Printing Implicit Defensive.
 
 Definition dagger : formula := atom (0, 0).
 Definition triangle : formula := atom (0, 1).
@@ -319,7 +311,7 @@ Lemma simplify_instantiate_var_neq : forall s n m, n <> m -> instantiate s n (va
 Proof. intros until 0. move => ?. unfold instantiate. inspect_eqb. reflexivity. Qed.
 Lemma simplify_instantiate_quant : forall s n t, instantiate s n (quant t) = quant (instantiate s (1+n) t).
 Proof. reflexivity. Qed.
-Lemma simplify_instantiate_atom : forall t s n, (exists a, t = atom a) -> instantiate s n t = t.
+Lemma simplify_instantiate_atom : forall (t : formula) s n, (exists a, t = atom a) -> instantiate s n t = t.
 Proof. intros until 0. case => a. move => ->. reflexivity. Qed.
 Lemma simplify_instantiate_U : forall (s t : formula) (n : nat), instantiate s n (U t) = U (instantiate s n t).
 Proof. auto. Qed.
@@ -338,7 +330,7 @@ Hint Rewrite simplify_instantiate_U simplify_instantiate_S simplify_instantiate_
 Hint Rewrite simplify_instantiate_arrow : simplify_formula.
 Hint Rewrite simplify_instantiate_var_eq simplify_instantiate_var_neq using omega : simplify_formula.
 Hint Rewrite simplify_instantiate_quant using omega : simplify_formula.
-Hint Rewrite simplify_instantiate_atom using (eexists; reflexivity) : simplify_formula.
+Hint Rewrite @simplify_instantiate_atom using (eexists; reflexivity) : simplify_formula.
 Hint Rewrite simplify_instantiate_one simplify_instantiate_triangle : simplify_formula.
-Hint Rewrite simplify_atom_get_label using (eexists; reflexivity) : simplify_formula.
+Hint Rewrite @simplify_atom_get_label using (eexists; reflexivity) : simplify_formula.
 Hint Rewrite Lc.instantiate_eq0 using done : simplify_formula.

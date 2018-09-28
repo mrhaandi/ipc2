@@ -1,26 +1,17 @@
-Require Import Utf8.
+Load Common.
 
 Require Import FormulaFacts.
 Require Export Derivations.
 Require Export Encoding.
 Require Export Diophantine.
-Require Import List.
 Require Import UserTactics.
 Require Import MiscFacts.
-Require Import Omega.
 Require Import Psatz. (*lia : linear integer arithmetic*)
-
-Import ListNotations.
 
 Require Import ListFacts.
 Import Encoding.
 
-From Coq Require Import ssreflect ssrfun ssrbool.
-Set Implicit Arguments.
-Unset Strict Implicit.
-Unset Printing Implicit Defensive.
-
-Notation "x ==> y" := (arr x y).
+(*Notation "x ==> y" := (arr x y) (at level 0).*)
 
 Lemma instantiate_quant (m : nat) : forall (Γ : list formula) (s : formula), 
   derivation Γ (quant s) -> derivation Γ (instantiate (represent_nat m) 0 s).
@@ -85,7 +76,7 @@ Proof.
 move => f ds.
 set g := fun x => Some (represent_nat (1 + f x)).
 
-have : ((triangle ==> triangle) ==> represent_diophantines_f f ds) = instantiate_prenex g (arr (arr triangle triangle) (represent_diophantines ds)).
+have : (arr (arr triangle triangle) (represent_diophantines_f f ds)) = instantiate_prenex g (arr (arr triangle triangle) (represent_diophantines ds)).
 unfold instantiate_prenex. f_equal. fold instantiate_prenex.
 revert dependent ds.
 elim; [auto | case ].

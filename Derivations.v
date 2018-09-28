@@ -1,18 +1,10 @@
-Require Import Utf8.
+Load Common.
 
 Require Import FormulaFacts.
-Require Import List.
-Require Import Omega.
-Import ListNotations.
 Require Import ListFacts.
 
 Require Import UserTactics.
 Require Import MiscFacts.
-
-From Coq Require Import ssreflect ssrfun ssrbool.
-Set Implicit Arguments.
-Unset Strict Implicit.
-Unset Printing Implicit Defensive.
 
 Inductive derivation (Γ: list formula) : formula → Prop :=
   | ax : ∀ (s: formula), In s Γ → derivation Γ s

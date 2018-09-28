@@ -1,16 +1,9 @@
+Load Common.
+
 Require Import PeanoNat.
-Require Import List.
-Import ListNotations.
 Require Import Psatz.
 
 Require Import UserTactics.
-
-From Coq Require Import ssreflect ssrfun ssrbool.
-Set Implicit Arguments.
-Unset Strict Implicit.
-Unset Printing Implicit Defensive.
-
-Set Maximal Implicit Insertion.
 
 (*
 Lemma if_eq : forall (f : nat -> nat) (x y : nat), (if y =? x then f x else f y) = f y.

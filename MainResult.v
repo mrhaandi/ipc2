@@ -1,15 +1,7 @@
-Require Import Utf8.
+Load Common.
 
 Require Import Soundness.
 Require Import Completeness.
-
-Require Import List.
-Import ListNotations.
-
-From Coq Require Import ssreflect ssrfun ssrbool.
-Set Implicit Arguments.
-Unset Strict Implicit.
-Unset Printing Implicit Defensive.
 
 (*
 given set "ds" of constraints (representing a diophantine equation),

@@ -1,13 +1,5 @@
-(*common header begin*)
-Require Import Utf8.
-From Coq Require Import ssreflect ssrfun ssrbool.
-Set Implicit Arguments.
-Unset Strict Implicit.
-Unset Printing Implicit Defensive.
-Set Maximal Implicit Insertion.
-(*common header end*)
+Load Common.
 
-Require Import Arith.
 Require Import Psatz. (*lia : linear integer arithmetic, nia : non-linear integer arithmetic*)
 
 

@@ -1,14 +1,4 @@
-Require Import Utf8.
-
-From Coq Require Import ssreflect ssrfun ssrbool.
-Set Implicit Arguments.
-Unset Strict Implicit.
-Unset Printing Implicit Defensive.
-
-Require Import Arith.
-Require Import Omega.
-Require Import List.
-Import ListNotations.
+Load Common.
 
 Require Import UserTactics.
 

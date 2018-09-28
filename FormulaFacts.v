@@ -1,17 +1,9 @@
-Require Import Utf8.
-Require Import Omega.
+Load Common.
+
 Require Import Psatz.
-Require Import List.
-Import ListNotations.
 Require Import UserTactics.
 Require Export Formula.
 Require Import MiscFacts.
-
-From Coq Require Import ssreflect ssrfun ssrbool.
-Set Implicit Arguments.
-Unset Strict Implicit.
-Unset Printing Implicit Defensive.
-
 Require Import ListFacts.
 
 (*Notation label := (nat * nat).*)
@@ -252,7 +244,7 @@ move => a n.
 apply fresh_in_atom.
 rewrite -> (surjective_pairing a).
 case => _.
-have := @fold_sum_gt (map formula_label_bound formulae) (n + S a.2) a.2.
+have := @fold_sum_gt (map formula_label_bound formulae) (n + S (snd a)) (snd a).
 lia.
 
 (*case arr*)

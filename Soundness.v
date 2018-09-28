@@ -1,24 +1,14 @@
-Require Import Utf8.
+Load Common.
 
 Require Import FormulaFacts.
 Require Import Derivations.
 Require Import Encoding.
-Require Import List.
 Require Import UserTactics.
-Require Import Omega.
 Require Import Psatz. (*lia : linear integer arithmetic*)
 Require Import Diophantine.
 Require Import Epsilon. (*Hilberts epsilon*)
 
-Import ListNotations.
-
 Require Import ListFacts.
-
-From Coq Require Import ssreflect ssrfun ssrbool.
-Set Implicit Arguments.
-Unset Strict Implicit.
-Unset Printing Implicit Defensive.
-Set Maximal Implicit Insertion.
 
 Lemma derive_quantified_arrow : forall n s t, derivation [triangle] (quantify_formula n t) -> derivation [triangle] (quantify_formula n (arr s t)).
 Proof.
