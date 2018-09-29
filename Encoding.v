@@ -211,6 +211,7 @@ have : f x = None by auto.
 by move => ->.
 Qed.
 
+
 Lemma inspect_chain_diophantines_aux : forall (m : nat) (params : list formula) (ds : list diophantine), 
   lc m (represent_diophantines ds) ->
   chain (quantify_formula m (arr (arr triangle triangle) (represent_diophantines ds))) (get_label triangle) params -> 

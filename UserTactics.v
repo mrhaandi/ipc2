@@ -65,7 +65,15 @@ Tactic Notation "inversion" := let H := fresh "top" in
   subst; (*do ? (match goal with [E : ?t = ?u |- _] => is_var u; tryif is_var t then subst t else subst u end); (*propagate substitutions*)*)
   do ? (match goal with [E : unkeyed ?e |- _] => change e in E end). (*restore equalities*)
 
-Tactic Notation "move" "//" := let H := fresh in move => H; move /(H); clear H.
+Tactic Notation "move" "//" := 
+  let H := fresh in move => H; 
+  match goal with 
+    | [|- _ -> _] => move /(H) 
+    | [|- forall _, _] => let a := fresh in move => a; move : (H a); (try clear a)
+  end; clear H.
+
+Tactic Notation "move" "\\" :=
+  let H1 := fresh in let H2 := fresh in move => H1 H2; move : H2 H1; move //.
   
 (*smarter to autorewrite? what happens under binders?*)
 Ltac inspect_eqb := try (
