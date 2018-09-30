@@ -6,7 +6,6 @@ Require Import Encoding.
 Require Import UserTactics.
 Require Import Psatz. (*lia : linear integer arithmetic*)
 Require Import Diophantine.
-Require Import Epsilon. (*Hilberts epsilon*)
 
 Require Import ListFacts.
 
@@ -384,148 +383,6 @@ Ltac decompose_USP :=
       (move/(generalize_IUS HU HS) => H; (eapply assert_prod in H => //); try eassumption) ].
 
 
-Lemma epsilon_interpretation : forall s m, interpretation s m -> m > 0 -> epsilon (inhabits 0) (fun m' => interpretation s (1+m')) = m-1.
-Proof.
-move => s m H Hm.
-have : exists m', m = 1+m' by exists (m-1); omega.
-move => [m' ?]; subst.
-suff : 1 + epsilon (inhabits 0) (fun m' => interpretation s (1+m')) = 1+m'.
-intros. omega.
-(have : exists m, interpretation s (1+m) by eauto) => H'.
-have := (epsilon_spec (inhabits 0) (fun m' => interpretation s (1+m')) H').
-intros.
-apply : interpretation_soundness; eassumption.
-Qed.
-
-
-Definition asd (s : formula) (m : nat) (H : interpretation s m) : 
-  {m' : nat | exists (s' : formula), interpretation s' m'} :=
-exist _ m (ex_intro _ s H).
-
-Inductive diophantine_var (x : nat) (ds : list diophantine) : Prop :=
-  | dio_var_one : forall (x' : nat), 
-    In (dio_one x') ds -> x = x' -> diophantine_var x ds
-  | dio_var_sum : forall (x' y' z' : nat), 
-    In (dio_sum x' y' z') ds -> x = x' \/ x = y' \/ x = z' -> diophantine_var x ds
-  | dio_var_prod : forall (x' y' z' : nat), 
-    In (dio_prod x' y' z') ds -> x = x' \/ x = y' \/ x = z' -> diophantine_var x ds.
-
-
-Fixpoint diophantine_variables (d : diophantine) : list nat :=
-  match d with
-  | (dio_one x) => [x]
-  | (dio_sum x y z) => [x; y; z]
-  | (dio_prod x y z) => [x; y; z]
-  end.
-
-Lemma diophantine_var_cons_iff : forall x d ds, 
-  diophantine_var x (d :: ds) <-> (diophantine_var x [d] \/ diophantine_var x ds).
-Proof.
-Admitted.
-
-Lemma diophantine_var_sub : forall x d ds, 
-  diophantine_var x ds -> diophantine_var x (d :: ds).
-Proof.
-Admitted.
-
-(*
-Lemma inspect_chain_diophantines_aux_one2 : forall (m : nat) (params : list formula) (ds : list diophantine), 
-  lc m (represent_diophantines ds) ->
-  chain (quantify_formula m (arr (arr triangle triangle) (represent_diophantines ds))) (get_label triangle) params -> 
-  
-  exists (f : nat -> formula), 
-  tail params = flat_map (represent_diophantine_repr f) ds /\ (forall (x : nat), m <= x -> f x = one).
-Proof.
-(*no more induction on n*)
-intros.
-gimme chain; simpl; inversion.
-gimme contains. simpl.
-
-move /quantified_arrow_not_contains_atom => //.
-
-gimme contains; move /contains_to_prenex_instantiation.
-nip. done.
-move [f [? [H_f H_f2]]].
-
-exists (fun n => match f n with | Some u => u | _ => one end); simpl.
-split.
-
-revert dependent ts.
-revert dependent u.
-revert dependent ds.
-elim.
-(*no equations*)
-simpl.
-intros; subst.
-gimme chain; inversion; auto.
-gimme contains; inversion.
-(*at least one equation*)
-
-
-case.
-{
-move => x.
-simpl. intros until 0 => IH; intros; subst.
-decompose_chain.
-decompose_lc.
-compute.
-have : exists u, f x = Some u ∧ lc 0 u by auto.
-move => [? [-> ?]].
-do ? f_equal.
-apply : IH => //.
-}
-
-{
-move => x y z.
-simpl. intros until 0 => IH; intros; subst.
-decompose_chain.
-decompose_lc.
-compute.
-have : exists ux, f x = Some ux ∧ lc 0 ux by auto.
-have : exists uy, f y = Some uy ∧ lc 0 uy by auto.
-have : exists uz, f z = Some uz ∧ lc 0 uz by auto.
-move => [? [-> ?]] [? [-> ?]] [? [-> ?]].
-do ? f_equal.
-apply : IH => //.
-}
-
-{
-move => x y z.
-simpl. intros until 0 => IH; intros; subst.
-decompose_chain.
-decompose_lc.
-compute.
-have : exists ux, f x = Some ux ∧ lc 0 ux by auto.
-have : exists uy, f y = Some uy ∧ lc 0 uy by auto.
-have : exists uz, f z = Some uz ∧ lc 0 uz by auto.
-move => [? [-> ?]] [? [-> ?]] [? [-> ?]].
-do ? f_equal.
-apply : IH => //.
-}
-
-move => x Hx.
-have : f x = None by auto.
-by move => ->.
-Qed.
-*)
-
-Lemma nat_s_pred : forall n, n > 0 -> (Datatypes.S (Nat.pred n)) = n.
-Proof.
-intros. omega.
-Qed.
-
-Lemma split_domain : forall (x : nat) (P Q : nat -> Prop),
-  (forall (n : nat), (x = n \/ P n) -> Q n) <-> (Q x /\ (forall (n : nat), P n -> Q n)).
-Proof.
-firstorder (subst; done).
-Qed.
-
-Ltac simplify_interpretation := 
-  match goal with 
-  [H1 : interpretation ?s ?m1 |- interpretation ?s ?m2 -> _] => 
-    let H2 := fresh in move => H2; have ? := interpretation_soundness H1 H2 
-  end.
-
 Lemma exists_succ : forall (P : nat -> Prop), 
   (exists (m : nat), P m /\ m > 0) -> exists (m : nat), P (Datatypes.S m).
 Proof.
@@ -535,38 +392,32 @@ have : Datatypes.S (Nat.pred m) = m by omega.
 by move => ->.
 Qed.
 
+
 Lemma finite_functional_choice : forall (f : nat -> formula) (xs : list nat),
-  (forall (x : nat), In x xs -> exists (m : nat), interpretation (f x) (1 + m))
-  -> exists g : (nat -> nat), forall (x : nat), In x xs -> interpretation (f x) (1 + g x).
+  Forall (fun x => exists (m : nat), interpretation (f x) (1 + m)) xs
+  -> exists g : (nat -> nat), Forall (fun x => interpretation (f x) (1 + g x)) xs.
 Proof.
 move => f. elim.
 intros. exists (fun _ => 0). intros. done.
 
-move => x xs IH H. move : IH.
-nip. intros. gimme where interpretation. apply.
-by apply in_cons.
+move => x xs IH. move /Forall_cons_iff.
+move => [[m ?]]. move /IH => [g H_g].
 
-move => [g H_g].
-move : (H x). nip. by left.
-move => [m ?].
 exists (fun x' => if x' =? x then m else g x').
-move => x'. case.
+constructor. by inspect_eqb.
 
-intro. subst. by inspect_eqb.
+apply : Forall_impl; last eassumption.
+move => x'. cbn. 
 
-move : H_g. move //.
 case : (Nat.eq_dec x x'); intro; inspect_eqb; by subst.
 Qed.
 
-Lemma in_flat_map_diophantine_variables : forall (P : nat -> Prop) (ds : list diophantine),
-  (forall (x : nat), In x (flat_map diophantine_variables ds) -> P x) -> 
-  forall (x : nat) (d : diophantine), In d ds -> In x (diophantine_variables d) -> P x.
-Proof.
-intros.
-gimme where flat_map. move /(_ x).
-rewrite in_flat_map. apply.
-eexists. split; eassumption.
-Qed.
+
+Ltac egalize_interpretation :=
+  match goal with 
+  [H1 : interpretation ?s ?m1, H2 : interpretation ?s ?m2 |- _] =>
+    tryif have ? : m1 = m2 by done then fail else have ? := interpretation_soundness H1 H2
+  end.
 
 Theorem soundness : forall (n : nat) (ΓU ΓS ΓP : list formula), 
   (forall (s : formula), In s ΓU -> represents_nat s) ->
@@ -651,9 +502,10 @@ move /inspect_chain_diophantines => [f H_f].
 gimme Forall; move /Forall_tl. gimme @eq where tl. move => ->.
 move /Forall_flat_map. move => Hds.
 
-have : forall (x : nat), In x (flat_map diophantine_variables ds) -> 
-  exists (m : nat), interpretation (f x) (1+m).
+have : Forall (fun x => exists (m : nat), 
+  interpretation (f x) (1+m)) (flat_map Diophantine.variables ds).
 {
+rewrite Forall_forall.
 move => x.
 rewrite in_flat_map. move => [d [? ?]].
 gimme where (In d ds).
@@ -667,25 +519,16 @@ revert dependent d. case; cbn; intros.
 
 move /finite_functional_choice.
 
-move => [g]. move /in_flat_map_diophantine_variables => H_g.
+move => [g ?].
 
-constructor.
-
-exists g.
-apply Forall_forall.
-
-move => d.
-move => Hdds. move : (Hdds).
-gimme where diophantine_variables. move //.
+constructor. exists g. apply Forall_forall => d Hdds.
+move : (Hdds). gimme Forall. move /Forall_flat_map. move //.
 move : Hdds. gimme where normal_derivation. move //.
-case : d; cbn; intros.
-
+case d; cbn.
+1-3 : intros.
 1-3 : decompose_Forall.
 1-3 : do ? decompose_USP.
-1-3 : gimme where or.
-1-3 : rewrite split_domain; case; simplify_interpretation.
-2-3 : rewrite split_domain; case; simplify_interpretation.
-2-3 : rewrite split_domain; case; simplify_interpretation.
+1-3 : do ? egalize_interpretation.
 1-3 : by inspect_eqb.
 
 case /(@in_app_or formula): H_In => [|H_In].

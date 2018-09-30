@@ -125,3 +125,11 @@ apply : H; [eassumption | omega].
 apply : Forall_impl; last eassumption.
 intros; apply : H; [eassumption | omega].
 Qed.
+
+Lemma Forall_cons_iff : forall (T : Type) (P : T -> Prop) (l : list T) (a : T),
+  Forall P (a :: l) <-> P a /\ Forall P l.
+Proof.
+intros. split.
+inversion. auto.
+case. intros. by constructor.
+Qed.

@@ -34,3 +34,9 @@ elim; cbn; first auto.
 move => n l IH k m H; cbn.
 apply : IH. lia.
 Qed.
+
+Lemma split_domain : forall (x : nat) (P Q : nat -> Prop),
+  (forall (n : nat), (x = n \/ P n) -> Q n) <-> (Q x /\ (forall (n : nat), P n -> Q n)).
+Proof.
+firstorder (subst; done).
+Qed.

@@ -30,4 +30,10 @@ Definition eval (f : nat -> nat) (d : diophantine) : bool :=
 Inductive solvable (ds : list diophantine) : Prop :=
   | solution : (exists (f : nat -> nat), Forall (fun d => eval f d = true) ds) -> solvable ds.
 
+Fixpoint variables (d : diophantine) : list nat :=
+  match d with
+  | (dio_one x) => [x]
+  | (dio_sum x y z) => [x; y; z]
+  | (dio_prod x y z) => [x; y; z]
+  end.
 End Diophantine.
