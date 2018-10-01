@@ -22,7 +22,7 @@ apply : completeness.
 
 have : [U one; P one one one] = [U one] ++ [] ++ [P one one one] by done.
 move => ->.
-move /normalization => [? HD].
+move /normal_derivation_completeness => [? HD].
 
 apply : soundness; try eassumption. 
 all: move => s; case => //; move => <-.

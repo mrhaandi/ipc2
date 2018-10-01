@@ -15,17 +15,15 @@ Inductive derivation (Γ: list formula) : formula → Prop :=
    (forall (a: label), derivation Γ (instantiate (atom a) 0 s)) → derivation Γ (Formula.quant s).
 
 Inductive normal_derivation : nat → list formula → formula → Prop :=
-(*(s :: Γ) in derive_arr not a problem, context permutation is admissible, think bottom-up*)
+(*(s :: Γ) in derive_arr not a problem, context permutation is admissible*)
   | derive_arr : ∀ (n : nat) (Γ: list formula) (s t: formula), 
     normal_derivation n (s :: Γ) t → normal_derivation (S n) Γ (Formula.arr s t)
   | derive_quant : ∀ (n : nat) (Γ: list formula) (s: formula), 
    (forall (a: label), normal_derivation n Γ (instantiate (atom a) 0 s) ) → normal_derivation (S n) Γ (Formula.quant s)
-(* | derive_atom : ∀ (n : nat) (Γ: list formula) (a: label) (s: formula) (params: list formula), 
-      In s Γ → Formula.chain s params a → (Forall (normal_derivation n Γ) (params)) → normal_derivation (if params is nil then n else S n) Γ (Formula.atom a).*)
   | derive_atom : ∀ (n : nat) (Γ: list formula) (a: label) (s: formula) (params: list formula), 
       In s Γ → Formula.chain s a params → (Forall (normal_derivation n Γ) (params)) → normal_derivation (S n) Γ (Formula.atom a).
 
-Conjecture normalization : forall (Γ: list formula) (s: formula), derivation Γ s → exists (n : nat), normal_derivation n Γ s.
+Axiom normal_derivation_completeness : forall (Γ: list formula) (s: formula), derivation Γ s → exists (n : nat), normal_derivation n Γ s.
 
 (*tries to solve derivation Γ s automatically*)
 Ltac derivation_rule := first
@@ -37,7 +35,7 @@ Ltac derivation_rule := first
   | (by (eauto using derivation))].
 
 
-Theorem conservativity : forall (n : nat) (Γ: list formula) (s: formula), normal_derivation n Γ s → derivation Γ s.
+Theorem normal_derivation_soundness : forall (n : nat) (Γ: list formula) (s: formula), normal_derivation n Γ s → derivation Γ s.
 Proof.
 elim; intros until 0.
 
@@ -62,20 +60,20 @@ Lemma inv_arr : forall (Γ : list formula) (s t : formula),
   derivation Γ (arr s t) -> derivation (s :: Γ) t.
 Proof.
 intros until 0.
-move /normalization => [? H].
+move /normal_derivation_completeness => [? H].
 inversion_clear H.
-apply: conservativity; eassumption.
+apply: normal_derivation_soundness; eassumption.
 Qed.
 
 Lemma inv_atom : forall (Γ : list formula) (a : label), derivation Γ (atom a) -> 
   exists (s : formula) (params : list formula), In s Γ /\ chain s a params /\ (Forall (derivation Γ) (params)).
 Proof.
 intros until 0.
-move /normalization => [? H].
+move /normal_derivation_completeness => [? H].
 inversion_clear H.
 match goal with | [H : Forall _ _ |- _] => eapply Forall_impl in H; first last end.
 intros.
-eapply conservativity. eassumption.
+eapply normal_derivation_soundness. eassumption.
 exists s, params. auto.
 Qed.
 
@@ -91,9 +89,9 @@ Lemma inv_quant : forall (Γ: list formula) (s : formula), derivation Γ (quant 
   (forall (a: label), derivation Γ (instantiate (atom a) 0 s)).
 Proof.
 intros until 0.
-move /normalization => [n HD].
+move /normal_derivation_completeness => [n HD].
 move /inv_normal_quant : HD => [m [? ?]].
-eauto using conservativity.
+eauto using normal_derivation_soundness.
 Qed.
 
 Lemma inv_normal_arr : forall (n : nat) (Γ: list formula) (s t : formula), normal_derivation n Γ (arr s t) ->
@@ -218,8 +216,8 @@ Proof.
 intros.
 have : Γ = map (substitute_label a b) Γ by apply map_substitute_fresh_label.
 move => ->.
-gimme derivation; move /normalization => [? ?].
-eauto using conservativity, substitute_normal_derivation.
+gimme derivation; move /normal_derivation_completeness => [? ?].
+eauto using normal_derivation_soundness, substitute_normal_derivation.
 Qed.
 
 
@@ -261,8 +259,8 @@ Lemma weakening : ∀ (Γ Δ: list formula) (t: formula),
   derivation Γ t → (∀ (s : formula), In s Γ → In s Δ) → derivation Δ t.
 Proof.
 intros until 0.
-move /normalization; case.
-eauto using conservativity, normal_weakening.
+move /normal_derivation_completeness; case.
+eauto using normal_derivation_soundness, normal_weakening.
 Qed.
 
 

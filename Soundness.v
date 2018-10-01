@@ -318,7 +318,7 @@ Lemma generalize_ISP : forall (n : nat) (ΓU ΓS ΓP : list formula),
   forall (ds : list diophantine) (s : formula), normal_derivation n (ΓI ds ++ ΓU ++ ΓS ++ ΓP) (U s) -> derivation (ΓU ++ [triangle; a_s; a_p]) (U s).
 Proof.
 intros.
-gimme normal_derivation. move /conservativity => HD.
+gimme normal_derivation. move /normal_derivation_soundness => HD.
 apply : (context_generalization HD).
 intros.
 filter_context_derivation.
@@ -338,7 +338,7 @@ Lemma generalize_IUP : forall (n : nat) (ΓU ΓS ΓP : list formula),
   derivation (ΓS ++ [triangle; a_u; a_p]) (S s1 s2 s3).
 Proof.
 intros.
-gimme normal_derivation. move /conservativity => HD.
+gimme normal_derivation. move /normal_derivation_soundness => HD.
 apply : (context_generalization HD).
 intros.
 filter_context_derivation.
@@ -358,7 +358,7 @@ Lemma generalize_IUS : forall (n : nat) (ΓU ΓS ΓP : list formula),
   derivation (ΓP ++ [triangle; a_u; a_s]) (P s1 s2 s3).
 Proof.
 intros.
-gimme normal_derivation. move /conservativity => HD.
+gimme normal_derivation. move /normal_derivation_soundness => HD.
 apply : (context_generalization HD).
 intros.
 filter_context_derivation.
