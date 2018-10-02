@@ -835,6 +835,29 @@ right. rewrite substitute_bind_fresh => //.
 constructor => //. by constructor.
 Qed.
 
+Lemma substitute_f_derivation : forall (a : label) (s : formula), lc 0 s -> forall (Γ : environment) (M : term) (t : formula), 
+  f_derivation Γ M t -> f_derivation (map (fun '(x, u) => (x, substitute a s u)) Γ) M (substitute a s t).
+Proof.
+Admitted.
+
+Lemma substitute_f_derivation_fresh : forall (a : label) (s : formula), lc 0 s -> forall (Γ : environment) (M : term) (t : formula), 
+  Forall (fresh_in a) (map snd Γ) -> f_derivation Γ M t -> f_derivation Γ M (substitute a s t).
+Proof.
+intros.
+have : (map (fun '(x, u) => (x, substitute a s u)) Γ) = Γ.
+gimme Forall. clear. elim : Γ; cbn => //.
+move => [x t] Γ IH. inversion.
+f_equal; auto.
+f_equal. by apply substitute_fresh.
+move => <-.
+by apply : substitute_f_derivation.
+Qed.
+
+
+Lemma idea : forall a Γ M s t u, f_derivation Γ M (quant (Formula.bind a 0 t)) -> generalizes (map snd Γ) s t -> exists t' s', 
+  f_derivation Γ M (quant (Formula.bind a 0 t')) /\ generalizes (u :: map snd Γ) s' t'.
+Proof.
+Admitted.
 
 Lemma f_head_generalized_chain : forall M Γ t, f_derivation Γ M t -> head_form M -> 
   exists x s u ts, In (x, s) Γ /\ 
@@ -844,13 +867,31 @@ Proof.
 intros until 0. elim.
 
 {
-intros. admit. (*easy*)
+clear. move => Γ x s *.
+exists x, s, s, [].
+do_last 3 split => //.
+constructor. constructor.
+apply generalizes_rfl.
 }
 
 {
-intros.
+clear.
+move => Γ M N s t *.
 gimme head_form. inversion.
-admit. (*easy*)
+gimme head_form. gimme where (head_form M). move //.
+move => [x [s' [u [ts' [? [? [? ?]]]]]]].
+gimme generalizes. inversion.
+exists x, s', t, (ts' ++ [s]).
+do_last 3 split => //.
+by apply partial_chain_arr.
+by apply generalizes_rfl.
+
+cbn. rewrite Forall_app. constructor.
+apply : Forall_impl; last eassumption.
+clear. firstorder omega.
+
+constructor => //.
+firstorder omega.
 }
 
 {
@@ -858,13 +899,13 @@ intros. gimme head_form. inversion.
 }
 
 {
-intros.
+clear. intros.
 gimme where partial_chain. move /(_ ltac:(assumption)).
 move => [x [s' [u [ts [? [? [? ?]]]]]]].
 gimme generalizes. inversion.
 
 {
-exists x, s', (instantiate t0 0 s), ts.
+exists x, s', (instantiate t 0 s), ts.
 split. done.
 split. apply : instantiate_partial_chain2 => //.
 split. constructor.
@@ -880,9 +921,29 @@ gimme f_derivation. move /f_derivation_wfe /wfe_wff.
 rewrite Forall_forall. move /(_ s'). rewrite in_map_iff. apply.
 firstorder done.
 
+revert dependent ts. gimme Forall. gimme In. gimme well_formed_formula.
+gimme generalizes. clear.
+move => H ? ? ?. elim : H.
+
+intros.
+exists x, (substitute a t s'), (substitute a t u), (map (substitute a t) ts).
+do_last 3 split.
+admit. (*easy*)
+gimme partial_chain. by apply /substitute_partial_chain.
+by constructor.
+gimme Forall. rewrite ? Forall_forall. move => ? t'.
+rewrite in_map_iff. move => [t'' [?]].
+gimme where f_derivation. move //. subst.
+move => [N [? [? ?]]]. exists N. firstorder auto.
+apply : substitute_f_derivation_fresh => //.
+
+move => b t' ? ? IH ts ? ?. cbn.
+(*
+(*what follows should be a proof by induction on generalizes that renames abstracted variables to fresh ones.*)
+
 (*need to to distinguish by freshness*)
 
-exists x, (substitute a t0 s'), (substitute a t0 u), (map (substitute a t0) ts).
+exists x, (substitute a t s'), (substitute a t u), (map (substitute a t) ts).
 split. admit. (*easy*)
 split.
 gimme partial_chain. apply /substitute_partial_chain.
@@ -891,7 +952,8 @@ split. admit. (*by apply : substitute_generalizes.*)
 gimme Forall where f_derivation. rewrite ? Forall_forall.
 move => ? ?. rewrite in_map_iff. move => [u' [?]]. subst.
 gimme where f_derivation. move //. move => [N [? [? ?]]].
-exists N. split => //. admit. (*needs substitute f_derivation*)
+exists N. split => //. by apply : substitute_f_derivation_fresh.
+*)
 }
 }
 
