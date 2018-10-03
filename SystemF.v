@@ -36,6 +36,17 @@ Tactic Notation "move" "(//)" :=
 Tactic Notation "move" "\\" :=
   let H1 := fresh in let H2 := fresh in move => H1 H2; move : H2 H1; move //.
 
+
+Lemma Forall_map_iff : forall (T U : Type) (P : U -> Prop) (f : T -> U) (l : list T), 
+  Forall P (map f l) <-> Forall (fun t => P (f t)) l.
+Proof.
+intros until 0. split; elim : l; cbn.
+intros; constructor.
+move => t l IH. inversion. constructor; auto.
+intros; constructor.
+move => t l IH. inversion. constructor; auto.
+Qed.
+
 Lemma label_rfl_eqb : forall (a : label), (Label.eqb a a = true).
 Proof.
 move => [a1 a2]. cbn.
@@ -95,6 +106,61 @@ Inductive f_derivation (Γ: environment) : term -> formula -> Prop :=
     f_derivation Γ M (quant s) -> well_formed_formula t -> f_derivation Γ M (instantiate t 0 s)
   | f_intro_quant : forall (M : term) (a : label) (s: formula), 
     fresh_formula_label a Γ -> f_derivation Γ M s -> f_derivation Γ M (quant (Formula.bind a 0 s)).
+
+
+Inductive f_derivation_depth : nat -> environment -> term -> formula -> Prop :=
+  | f_ax_depth : forall (n : nat) (Γ: environment) (x : label) (s: formula), well_formed_environment Γ -> 
+    In (x, s) Γ -> f_derivation_depth n Γ (free_var x) s
+  | f_elim_arr_depth : forall (n : nat) (Γ: environment) (M N : term) (s t : formula), 
+    f_derivation_depth n Γ M (Formula.arr s t) -> f_derivation_depth n Γ N s -> f_derivation_depth (S n) Γ (term_app M N) t
+  | f_intro_arr_depth : forall (n : nat) (Γ: environment) (x : label) (s t : formula) (M : term), 
+    f_derivation_depth n ((x, s) :: Γ) M t -> f_derivation_depth (S n) Γ (term_abs (Term.bind x 0 M)) (arr s t)
+  | f_elim_quant_depth : forall (n : nat) (Γ: environment) (M : term) (s t : formula), 
+    f_derivation_depth n Γ M (quant s) -> well_formed_formula t -> f_derivation_depth (S n) Γ M (instantiate t 0 s)
+  | f_intro_quant_depth : forall (n : nat) (Γ: environment) (M : term) (a : label) (s: formula), 
+    fresh_formula_label a Γ -> f_derivation_depth n Γ M s -> f_derivation_depth (S n) Γ M (quant (Formula.bind a 0 s)).
+
+
+Lemma relax_depth_f_derivation : forall (n m : nat) (Γ : environment) (M : term) (t : formula),
+  n <= m -> f_derivation_depth n Γ M t -> f_derivation_depth m Γ M t.
+Proof.
+elim /lt_wf_ind. move => n IH m Γ M t ?. inversion.
+eauto using f_derivation_depth.
+all: (have : m = S (Nat.pred m) by omega) => ->.
+all: match goal with [_ : f_derivation_depth ?n' _ _ _ |- _] => rename n' into n end.
+all: specialize (IH n ltac:(omega)).
+apply : f_elim_arr_depth; apply : IH; try eassumption; omega.
+apply : f_intro_arr_depth; apply : IH; try eassumption; omega.
+apply : f_elim_quant_depth; try eassumption; apply : IH; try eassumption; omega.
+apply : f_intro_quant_depth; try eassumption; apply : IH; try eassumption; omega.
+Qed.
+
+
+Lemma f_derivation_exists_depth : forall (Γ : environment) (M : term) (t : formula),
+  f_derivation Γ M t -> exists (n : nat), f_derivation_depth n Γ M t.
+Proof.
+intros until 0. elim; cbn; clear; intros.
+
+exists 0. eauto using f_derivation_depth.
+
+gimme ex where f_derivation_depth. move => [n1 ?].
+gimme ex where f_derivation_depth. move => [n2 ?].
+exists (S (n1+n2)).
+apply : f_elim_arr_depth.
+apply : relax_depth_f_derivation; last eassumption; omega.
+apply : relax_depth_f_derivation; last eassumption; omega.
+
+all: gimme ex where f_derivation_depth; move => [n ?]; exists (S n); eauto using f_derivation_depth.
+Qed.
+
+
+Lemma f_derivation_erase_depth : forall (n : nat) (Γ : environment) (M : term) (t : formula),
+  f_derivation_depth n Γ M t -> f_derivation Γ M t.
+Proof.
+intros until 0. elim; cbn; clear; intros.
+all: eauto using f_derivation.
+Qed.
+
 
 
 Lemma f_derivation_wft : forall (Γ : environment) (M : term) (t : formula), 
@@ -164,7 +230,7 @@ by apply Lc.instantiate_pred.
 intros. constructor. by apply : lc_bind2.
 Qed.
 
-
+(*
 Inductive derivation2 : nat -> environment -> term -> formula → Prop :=
   | ax : forall (n : nat) (Γ : environment) (x : label) (s: formula), 
     In (x, s) Γ -> derivation2 n Γ (free_var x) s
@@ -176,6 +242,7 @@ Inductive derivation2 : nat -> environment -> term -> formula → Prop :=
     derivation2 n Γ M (quant s) -> lc 0 t -> derivation2 (S n) Γ M (instantiate t 0 s)
   | intro_quant : forall (n : nat) (Γ : environment) (M : term) (s : formula), 
     (forall (a: label), derivation2 n Γ M (instantiate (atom a) 0 s)) -> derivation2 (S n) Γ M (quant s).
+*)
 
 (*chain s a params morally means that s can be instanciated as p1 -> ... -> pn -> a*)
 Inductive partial_chain (s t : formula) : list formula -> Prop :=
@@ -796,6 +863,19 @@ move => [? s] Γ IH. inversion.
 constructor; eauto.
 Qed.
 
+Lemma fresh_formula_label_iff : forall a Γ, fresh_formula_label a Γ <-> Forall (fresh_in a) (map snd Γ).
+Proof.
+intros. split.
+apply : fresh_formula_label_Forall.
+
+elim : Γ.
+intros. constructor.
+
+move => [? s] Γ IH. inversion.
+constructor; eauto.
+by apply : IH.
+Qed.
+
 (*
 Lemma substitute_generalizes : forall a s Γ t u, 
   Forall (fresh_in a) Γ -> not (fresh_in a u) -> generalizes Γ t u -> generalizes Γ (substitute a s t) (substitute a s u).
@@ -891,10 +971,114 @@ right. rewrite substitute_bind_fresh => //.
 constructor => //. by constructor.
 Qed.
 
+
+Lemma map_substitute_fresh_in_environment : forall a s Γ, 
+  fresh_formula_label a Γ -> (map (fun '(x, t) => (x, substitute a s t)) Γ) = Γ.
+Proof.
+move => a s. elim; cbn => //.
+move => [x t] Γ *.
+gimme fresh_formula_label. inversion.
+f_equal; last auto.
+f_equal. by apply : substitute_fresh.
+Qed.
+
+
+Lemma eq_impl : forall (a b : Type), a = b -> a -> b.
+Proof. intros. by subst. Qed.
+
+
+Lemma substitute_bind2 : forall a b c s t n,
+  lc 0 s -> fresh_in c s -> c <> b -> fresh_in c t ->
+  Formula.bind c n (substitute b s (substitute a (atom c) t)) = substitute b s (Formula.bind a n t).
+Proof.
+intros. move : n. revert dependent t. elim => //; cbn.
+move => d ? n. 
+gimme fresh_in where atom. inversion.
+case : (Label.eqb a d); cbn. 
+label_inspect_eqb. cbn. by label_inspect_eqb.
+case : (Label.eqb b d); cbn.
+by apply : bind_fresh.
+by label_inspect_eqb.
+
+all: intros; gimme fresh_in; inversion; f_equal; auto.
+Qed.
+
+
+Lemma substitute_wfe : forall a s Γ, 
+  lc 0 s -> well_formed_environment Γ -> well_formed_environment (map (fun '(x, t) => (x, substitute a s t)) Γ).
+Proof.
+move => a s Γ ?.
+elim : Γ; cbn.
+intros. constructor.
+move => [x t] Γ IH. inversion.
+constructor; auto.
+by apply lc_substitute.
+gimme fresh_term_label. rewrite /fresh_term_label.
+rewrite Forall_map_iff.
+apply /Forall_impl. by move => [x' t'].
+Qed.
+
 Lemma substitute_f_derivation : forall (a : label) (s : formula), lc 0 s -> forall (Γ : environment) (M : term) (t : formula), 
   f_derivation Γ M t -> f_derivation (map (fun '(x, u) => (x, substitute a s u)) Γ) M (substitute a s t).
 Proof.
-Admitted.
+intros.
+gimme f_derivation. move /f_derivation_exists_depth => [n ?].
+apply : (@f_derivation_erase_depth n).
+gimme f_derivation_depth.
+revert dependent s.
+elim /lt_wf_ind : n a Γ M t => n IH a Γ M t s ?.
+inversion.
+
+{ (*case ax*)
+apply : f_ax_depth.
+by apply : substitute_wfe.
+rewrite in_map_iff.
+eexists. split; last eassumption. reflexivity.
+}
+
+{ (*case elim_arr*)
+gimme f_derivation_depth. move /IH. cbn => IH2.
+gimme f_derivation_depth. move /IH. cbn => IH1.
+apply : f_elim_arr_depth.
+apply : IH1 => //; omega. apply : IH2 => //; omega.
+}
+
+{ (*case intro_arr*)
+cbn. apply : f_intro_arr_depth.
+gimme f_derivation_depth. move /IH. cbn. apply => //.
+}
+
+{ (*case elim_quant*)
+rewrite substitute_instantiation2 => //.
+apply : f_elim_quant_depth => //; first last.
+by apply lc_substitute.
+gimme f_derivation_depth. move /IH. cbn. apply => //.
+}
+
+{ (*case f_intro_quant*)
+cbn.
+match goal with [_ : fresh_formula_label ?b' _ |- _] => rename b' into b end.
+match goal with [_ : f_derivation_depth ?n' _ _ ?t' |- _] => rename n' into n; rename t' into t end.
+have [c ?] := exists_fresh ((atom a) :: s :: t :: (map snd Γ)).
+decompose_Forall. gimme fresh_in where atom. inversion.
+gimme f_derivation_depth. move /IH.
+nip. omega. move /(_ b (atom c)). nip. constructor.
+move /IH. nip. omega. move /(_ a s). nip. done.
+move /f_intro_quant_depth. move /(_ c). nip.
+{ (*c is fresh in substituted Γ*)
+gimme fresh_formula_label. move /map_substitute_fresh_in_environment => ->.
+clear IH. gimme Forall. elim : Γ; cbn.
+intros. constructor.
+move => [x u] Γ IH *. gimme Forall. inversion.
+constructor. 
+by apply fresh_in_substitute.
+by apply IH.
+}
+gimme (fresh_formula_label). move /map_substitute_fresh_in_environment => ->.
+refine (eq_impl _). f_equal. by do ? (do [move => -> | move => ?]).
+f_equal. by apply substitute_bind2.
+}
+Qed.
 
 Lemma substitute_f_derivation_fresh : forall (a : label) (s : formula), lc 0 s -> forall (Γ : environment) (M : term) (t : formula), 
   Forall (fresh_in a) (map snd Γ) -> f_derivation Γ M t -> f_derivation Γ M (substitute a s t).
@@ -918,15 +1102,7 @@ by constructor.
 intros. decompose_Forall. by apply : generalizes_step.
 Qed.
 
-Lemma Forall_map_iff : forall (T U : Type) (P : U -> Prop) (f : T -> U) (l : list T), 
-  Forall P (map f l) <-> Forall (fun t => P (f t)) l.
-Proof.
-intros until 0. split; elim : l; cbn.
-intros; constructor.
-move => t l IH. inversion. constructor; auto.
-intros; constructor.
-move => t l IH. inversion. constructor; auto.
-Qed.
+
 
 
 Lemma substitute_fresh_in_environment : forall a x (Γ : environment) s t, 
@@ -967,16 +1143,34 @@ Proof.
 Admitted.
 *)
 
+Lemma substitute_id : forall a s, substitute a (atom a) s = s.
+Proof.
+move => a. elim => //; cbn.
+move => b. case : (Label.eq_dec a b); intro; subst; by label_inspect_eqb.
+
+all: intros; f_equal; auto.
+Qed.
+
+
+(*rethink*)
 Lemma rename_generalizes : forall a b Γ s t, generalizes Γ s t -> 
   Forall (fresh_in b) (s :: Γ) -> generalizes Γ (substitute a (atom b) s) (substitute a (atom b) t).
 Proof.
-intros until 0. elim.
+intros until 0.
+case : (Label.eq_dec a b); intro; subst.
+by rewrite ? substitute_id.
+
+elim.
 intros. constructor.
-clear. move => c t *. cbn.
-case : (Label.eq_dec a c); intro; subst.
+clear t. move => c t *. cbn.
+case : (Label.eq_dec a c); case : (Label.eq_dec b c); intros; subst.
+
+rewrite ? substitute_id. decompose_Forall. by apply generalizes_step.
+rewrite substitute_bind_eq. apply : generalizes_step => //.
+
 admit.
-rewrite substitute_bind_fresh.
 Admitted.
+
 
 Lemma rename_generalizes2 : forall a b Γ u s, generalizes Γ u s -> 
 Forall (fresh_in b) (u :: Γ) ->
@@ -989,8 +1183,6 @@ gimme generalizes. move /fresh_in_generalizes. by apply.
 apply generalizes_step =>//.
 apply : rename_generalizes => //. by constructor.
 Qed.
-
-
 
 
 Lemma f_head_generalized_chain2 : forall M Γ t, f_derivation Γ M t -> head_form M -> 
