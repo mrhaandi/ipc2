@@ -47,25 +47,7 @@ intros; constructor.
 move => t l IH. inversion. constructor; auto.
 Qed.
 
-Lemma label_rfl_eqb : forall (a : label), (Label.eqb a a = true).
-Proof.
-move => [a1 a2]. cbn.
-by rewrite <- ? beq_nat_refl.
-Qed.
 
-Ltac label_inspect_eqb := try (
-  match goal with
-  | [ |- context [Label.eqb ?x ?x]] => 
-    (have : x = x by reflexivity); move /Label.eq_eqb => ->
-  | [H : ?x <> ?y |- context [Label.eqb ?x ?y]] => 
-    (have := Label.neq_neqb H); move => ->
-  | [H : ?y <> ?x |- context [Label.eqb ?x ?y]] => 
-    (have := Label.neq_neqb (not_eq_sym H)); move => ->
-  | [H : ?x = ?y |- context [Label.eqb ?x ?y]] => 
-    (have := Label.eq_eqb H); move => ->
-  | [H : ?y = ?x |- context [Label.eqb ?x ?y]] => 
-    (have := Label.eq_eqb (eq_sym H)); move => ->
-  end).
 
 (*additional lemmas*)
 Lemma lc_bind : forall (M : term) (n : nat) (x : label), Term.lc n M -> Term.lc (S n) (Term.bind x n M).
@@ -254,6 +236,31 @@ Inductive generalizes (Γ : list formula) (s : formula) : formula -> Prop :=
   | generalizes_rfl : generalizes Γ s s
   | generalizes_step : forall (a : label) (t : formula), 
     Forall (fresh_in a) Γ -> generalizes Γ s t -> generalizes Γ s (quant (Formula.bind a 0 t)).
+
+(*generalizes2 s t l means as in l are bound in t*)
+Inductive generalizes2 (s : formula) : formula -> list label -> Prop :=
+  | generalizes2_rfl : generalizes2 s s []
+  | generalizes2_step : forall (a : label) (t : formula) (l : list label), 
+    generalizes2 s t l -> generalizes2 s (quant (Formula.bind a 0 t)) (a :: l).
+
+Lemma generalizes1_2 : forall Γ s t, generalizes Γ s t -> 
+  exists l, generalizes2 s t l /\ (Forall (fun a => Forall (fresh_in a) Γ) l).
+Proof.
+intros until 0. elim.
+exists []. firstorder constructor.
+move => a u ? ? [l [? ?]].
+exists (a :: l). by firstorder constructor.
+Qed.
+
+
+Lemma generalizes2_1 : forall Γ s t l, generalizes2 s t l -> (Forall (fun a => Forall (fresh_in a) Γ) l) ->
+  generalizes Γ s t.
+Proof.
+intros until 0. elim.
+intros. constructor.
+clear. move => a t l ? ?. inversion.
+apply : generalizes_step; eauto.
+Qed.
 
 Inductive generalized_chain (Γ : list formula) (s : formula) : formula -> list formula -> Prop :=
   | generalized_chain_nil : generalized_chain Γ s s List.nil
@@ -908,8 +915,8 @@ Qed.
 Lemma substitute_bind_eq : forall a s t n, substitute a s (Formula.bind a n t) = Formula.bind a n t.
 Proof.
 intros. elim : t n => //; cbn.
-move => b n. case : (Label.eq_dec a b); intro; do ? label_inspect_eqb; cbn => //.
-by label_inspect_eqb.
+move => b n. case : (Label.eq_dec a b); intro; do ? Label.inspect_eqb; cbn => //.
+by Label.inspect_eqb.
 
 all: intros; f_equal; auto.
 Qed.
@@ -928,7 +935,7 @@ Admitted.
 Lemma bind_fresh : forall a t n, fresh_in a t -> Formula.bind a n t = t.
 Proof.
 move => a. elim => //; cbn.
-intros until 0. inversion. by label_inspect_eqb.
+intros until 0. inversion. by Label.inspect_eqb.
 
 all: intros; gimme fresh_in; inversion; f_equal; auto.
 Qed.
@@ -939,11 +946,11 @@ Lemma substitute_bind_fresh : forall a b s t n,
 Proof.
 intros. elim : t n; cbn => //.
 move => c n.
-case : (Label.eq_dec b c); case : (Label.eq_dec a c); intros; subst; do ? label_inspect_eqb; cbn.
+case : (Label.eq_dec b c); case : (Label.eq_dec a c); intros; subst; do ? Label.inspect_eqb; cbn.
 done.
-by label_inspect_eqb.
-label_inspect_eqb. by rewrite bind_fresh.
-by do ? label_inspect_eqb.
+by Label.inspect_eqb.
+Label.inspect_eqb. by rewrite bind_fresh.
+by do ? Label.inspect_eqb.
 
 all: intros; f_equal; auto.
 Qed.
@@ -995,10 +1002,10 @@ intros. move : n. revert dependent t. elim => //; cbn.
 move => d ? n. 
 gimme fresh_in where atom. inversion.
 case : (Label.eqb a d); cbn. 
-label_inspect_eqb. cbn. by label_inspect_eqb.
+Label.inspect_eqb. cbn. by Label.inspect_eqb.
 case : (Label.eqb b d); cbn.
 by apply : bind_fresh.
-by label_inspect_eqb.
+by Label.inspect_eqb.
 
 all: intros; gimme fresh_in; inversion; f_equal; auto.
 Qed.
@@ -1117,7 +1124,7 @@ Lemma substitute_bind : forall a b t n,
   fresh_in b t -> Formula.bind a n t = Formula.bind b n (substitute a (atom b) t).
 Proof.
 move => a b. elim => //; cbn.
-move => c n. inversion. case : (Label.eqb a c); cbn; by label_inspect_eqb.
+move => c n. inversion. case : (Label.eqb a c); cbn; by Label.inspect_eqb.
 
 all: intros; gimme fresh_in; inversion; f_equal; auto.
 Qed.
@@ -1125,7 +1132,7 @@ Qed.
 Lemma fresh_in_bind : forall a b t n, fresh_in a t -> fresh_in a (Formula.bind b n t).
 Proof.
 intros until 0. elim : t n => //; cbn.
-move => c n. inversion. case : (Label.eq_dec b c); intro; do ? label_inspect_eqb; by constructor.
+move => c n. inversion. case : (Label.eq_dec b c); intro; do ? Label.inspect_eqb; by constructor.
 all: intros; gimme fresh_in; inversion; constructor; auto.
 Qed.
 
@@ -1133,6 +1140,13 @@ Lemma fresh_in_generalizes : forall a Γ s t, generalizes Γ s t -> fresh_in a s
 Proof.
 intros until 0. elim => //.
 clear. move => b t *. constructor. cbn.
+apply : fresh_in_bind; auto.
+Qed.
+
+Lemma fresh_in_generalizes2 : forall a s t l, generalizes2 s t l -> fresh_in a s -> fresh_in a t.
+Proof.
+intros until 0. elim => //.
+clear. move => b t *. constructor.
 apply : fresh_in_bind; auto.
 Qed.
 
@@ -1146,10 +1160,53 @@ Admitted.
 Lemma substitute_id : forall a s, substitute a (atom a) s = s.
 Proof.
 move => a. elim => //; cbn.
-move => b. case : (Label.eq_dec a b); intro; subst; by label_inspect_eqb.
+move => b. case : (Label.eq_dec a b); intro; subst; by Label.inspect_eqb.
 
 all: intros; f_equal; auto.
 Qed.
+
+Lemma substitute_bind3 : forall a b t n, fresh_in b t -> (substitute a (atom b) (Formula.bind a n t)) = 
+  (Formula.bind b n (substitute a (atom b) t)).
+Proof.
+move => a b. elim; cbn => //.
+move => c *. gimme fresh_in. inversion.
+case : (Label.eq_dec a c); 
+intro; Label.inspect_eqb; cbn; by do ? Label.inspect_eqb.
+
+all: intros; gimme fresh_in; inversion; f_equal; auto.
+Qed.
+
+Lemma substitute_bind4 : forall a b c t n, a <> c -> b <> c -> 
+  substitute a (atom b) (Formula.bind c n t) = Formula.bind c n (substitute a (atom b) t).
+Proof.
+move => a b c. elim; cbn => //.
+move => d *.
+case : (Label.eq_dec c d); intro; subst; Label.inspect_eqb; cbn. 
+Label.inspect_eqb. cbn. by Label.inspect_eqb.
+
+case : (Label.eqb a d); cbn; by Label.inspect_eqb.
+
+all: intros; f_equal; auto.
+Qed.
+
+
+(*proceed by showing that Forall (fun c => c <> b) l is redundant*)
+Lemma rename_generalizes2 : forall a b l s t, generalizes2 s t l -> 
+  fresh_in b s -> Forall (fun c => c <> b) l -> generalizes2 (substitute a (atom b) s) (substitute a (atom b) t) (map (fun c => if Label.eqb a c then b else c) l).
+Proof.
+intros until 0. elim.
+intros. constructor.
+
+clear. move => c t l *. decompose_Forall. cbn.
+case : (Label.eq_dec a c); intro; subst; Label.inspect_eqb.
+
+rewrite substitute_bind3. apply : fresh_in_generalizes2; eassumption.
+apply generalizes2_step. eauto.
+
+rewrite substitute_bind4 => //. intro; by subst.
+apply generalizes2_step. eauto.
+Qed.
+
 
 
 (*rethink*)
@@ -1163,6 +1220,14 @@ by rewrite ? substitute_id.
 elim.
 intros. constructor.
 clear t. move => c t *. cbn.
+have [d ?] := exists_fresh ((atom a) :: (atom b) :: (atom c) :: s :: t :: Γ).
+do 5 (gimme Forall; inversion).
+do 3 (gimme fresh_in where atom; inversion).
+
+rewrite <- (@substitute_bind2 _ _ d) => //; try (by constructor).
+apply : generalizes_step => //.
+
+
 case : (Label.eq_dec a c); case : (Label.eq_dec b c); intros; subst.
 
 rewrite ? substitute_id. decompose_Forall. by apply generalizes_step.

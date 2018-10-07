@@ -72,4 +72,24 @@ have := Nat.eq_dec a1 b1; have := Nat.eq_dec a2 b2.
 firstorder auto.
 Qed.
 
+Lemma rfl_eqb : forall (a : label), (Label.eqb a a = true).
+Proof.
+move => [a1 a2]. cbn.
+by rewrite <- ? beq_nat_refl.
+Qed.
+
+Ltac inspect_eqb := try (
+  match goal with
+  | [ |- context [Label.eqb ?x ?x]] => 
+    (have : x = x by reflexivity); move /Label.eq_eqb => ->
+  | [H : ?x <> ?y |- context [Label.eqb ?x ?y]] => 
+    (have := Label.neq_neqb H); move => ->
+  | [H : ?y <> ?x |- context [Label.eqb ?x ?y]] => 
+    (have := Label.neq_neqb (not_eq_sym H)); move => ->
+  | [H : ?x = ?y |- context [Label.eqb ?x ?y]] => 
+    (have := Label.eq_eqb H); move => ->
+  | [H : ?y = ?x |- context [Label.eqb ?x ?y]] => 
+    (have := Label.eq_eqb (eq_sym H)); move => ->
+  end).
+
 End Label.

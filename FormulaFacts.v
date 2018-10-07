@@ -432,3 +432,19 @@ have ? := substitute_fresh_label.
 decompose_Forall.
 f_equal; auto.
 Qed.
+
+Lemma instantiate_bind: forall a s n, lc n s -> instantiate (atom a) n (Formula.bind a n s) = s.
+Proof.
+move => a. elim; cbn => //.
+intros until 0. inversion. by inspect_eqb.
+move => b *. case : (Label.eq_dec a b) => ?; subst; Label.inspect_eqb; cbn; by inspect_eqb.
+all: intros; gimme lc; inversion; f_equal; auto.
+Qed.
+
+Lemma bind_instantiate: forall a s n, fresh_in a s -> Formula.bind a n (instantiate (atom a) n s) = s.
+Proof.
+move => a. elim; cbn => //.
+move => n1 n2 *. case : (Nat.eq_dec n2 n1); intro; subst; inspect_eqb; cbn; by Label.inspect_eqb.
+intros until 0. inversion. by Label.inspect_eqb.
+all: intros; gimme fresh_in; inversion; f_equal; auto.
+Qed.
