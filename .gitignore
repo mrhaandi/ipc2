@@ -2,3 +2,6 @@
 *.glob
 *.vo
 *.cache
+/.coqdeps.d
+/Makefile.coq
+/Makefile.coq.conf

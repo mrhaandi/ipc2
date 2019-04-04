@@ -168,7 +168,7 @@ gimme contains; inversion.
 case.
 {
 move => x.
-simpl. intros until 0 => IH; intros; subst.
+simpl. intros * => IH; intros; subst.
 decompose_chain.
 decompose_lc.
 compute.
@@ -180,7 +180,7 @@ apply : IH => //.
 
 {
 move => x y z.
-simpl. intros until 0 => IH; intros; subst.
+simpl. intros * => IH; intros; subst.
 decompose_chain.
 decompose_lc.
 compute.
@@ -194,7 +194,7 @@ apply : IH => //.
 
 {
 move => x y z.
-simpl. intros until 0 => IH; intros; subst.
+simpl. intros * => IH; intros; subst.
 decompose_chain.
 decompose_lc.
 compute.
@@ -246,7 +246,7 @@ gimme contains; inversion.
 case.
 {
 move => x.
-simpl. intros until 0 => IH; intros; subst.
+simpl. intros * => IH; intros; subst.
 decompose_chain.
 decompose_lc.
 compute.
@@ -258,7 +258,7 @@ apply : IH => //.
 
 {
 move => x y z.
-simpl. intros until 0 => IH; intros; subst.
+simpl. intros * => IH; intros; subst.
 decompose_chain.
 decompose_lc.
 compute.
@@ -272,7 +272,7 @@ apply : IH => //.
 
 {
 move => x y z.
-simpl. intros until 0 => IH; intros; subst.
+simpl. intros * => IH; intros; subst.
 decompose_chain.
 decompose_lc.
 compute.
@@ -307,13 +307,13 @@ Create HintDb simplify_formula.
 Lemma simplify_instantiate_arrow : forall s t u n, instantiate s n (arr t u) = arr (instantiate s n t) (instantiate s n u).
 Proof. reflexivity. Qed. 
 Lemma simplify_instantiate_var_eq : forall s n m, n = m -> instantiate s n (var m) = s.
-Proof. intros until 0. move => ->. unfold instantiate. inspect_eqb. reflexivity. Qed.
+Proof. intros *. move => ->. unfold instantiate. inspect_eqb. reflexivity. Qed.
 Lemma simplify_instantiate_var_neq : forall s n m, n <> m -> instantiate s n (var m) = var m.
-Proof. intros until 0. move => ?. unfold instantiate. inspect_eqb. reflexivity. Qed.
+Proof. intros *. move => ?. unfold instantiate. inspect_eqb. reflexivity. Qed.
 Lemma simplify_instantiate_quant : forall s n t, instantiate s n (quant t) = quant (instantiate s (1+n) t).
 Proof. reflexivity. Qed.
 Lemma simplify_instantiate_atom : forall (t : formula) s n, (exists a, t = atom a) -> instantiate s n t = t.
-Proof. intros until 0. case => a. move => ->. reflexivity. Qed.
+Proof. intros *. case => a. move => ->. reflexivity. Qed.
 Lemma simplify_instantiate_U : forall (s t : formula) (n : nat), instantiate s n (U t) = U (instantiate s n t).
 Proof. auto. Qed.
 Lemma simplify_instantiate_S : forall (s t1 t2 t3 : formula) (n : nat), instantiate s n (S t1 t2 t3) = S (instantiate s n t1) (instantiate s n t2) (instantiate s n t3).
@@ -321,7 +321,7 @@ Proof. auto. Qed.
 Lemma simplify_instantiate_P : forall (s t1 t2 t3 : formula) (n : nat), instantiate s n (P t1 t2 t3) = P (instantiate s n t1) (instantiate s n t2) (instantiate s n t3).
 Proof. auto. Qed.
 Lemma simplify_atom_get_label : forall t, (exists a, t = atom a) -> (atom (get_label t)) = t.
-Proof. intros until 0. case => a. move => ->. reflexivity. Qed.
+Proof. intros *. case => a. move => ->. reflexivity. Qed.
 Lemma simplify_instantiate_one : forall s n, instantiate s n one = one.
 Proof. intros; reflexivity. Qed.
 Lemma simplify_instantiate_triangle : forall s n, instantiate s n triangle = triangle.

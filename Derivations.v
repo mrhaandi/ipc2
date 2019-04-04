@@ -37,7 +37,7 @@ Ltac derivation_rule := first
 
 Theorem normal_derivation_soundness : forall (n : nat) (Γ: list formula) (s: formula), normal_derivation n Γ s → derivation Γ s.
 Proof.
-elim; intros until 0.
+elim; intros *.
 
 (*base case n = 0*)
 inversion.
@@ -59,7 +59,7 @@ Qed.
 Lemma inv_arr : forall (Γ : list formula) (s t : formula),
   derivation Γ (arr s t) -> derivation (s :: Γ) t.
 Proof.
-intros until 0.
+intros *.
 move /normal_derivation_completeness => [? H].
 inversion_clear H.
 apply: normal_derivation_soundness; eassumption.
@@ -68,7 +68,7 @@ Qed.
 Lemma inv_atom : forall (Γ : list formula) (a : label), derivation Γ (atom a) -> 
   exists (s : formula) (params : list formula), In s Γ /\ chain s a params /\ (Forall (derivation Γ) (params)).
 Proof.
-intros until 0.
+intros *.
 move /normal_derivation_completeness => [? H].
 inversion_clear H.
 match goal with | [H : Forall _ _ |- _] => eapply Forall_impl in H; first last end.
@@ -80,7 +80,7 @@ Qed.
 Lemma inv_normal_quant : forall (n : nat) (Γ: list formula) (s : formula), normal_derivation n Γ (quant s) ->
   exists (m : nat), n = S m /\ (forall (a: label), normal_derivation m Γ (instantiate (atom a) 0 s)).
 Proof.
-intros until 0 => H.
+intros * => H.
 inversion_clear H.
 eexists; split; [reflexivity | assumption].
 Qed.
@@ -88,7 +88,7 @@ Qed.
 Lemma inv_quant : forall (Γ: list formula) (s : formula), derivation Γ (quant s) ->
   (forall (a: label), derivation Γ (instantiate (atom a) 0 s)).
 Proof.
-intros until 0.
+intros *.
 move /normal_derivation_completeness => [n HD].
 move /inv_normal_quant : HD => [m [? ?]].
 eauto using normal_derivation_soundness.
@@ -97,7 +97,7 @@ Qed.
 Lemma inv_normal_arr : forall (n : nat) (Γ: list formula) (s t : formula), normal_derivation n Γ (arr s t) ->
   exists (m : nat), n = S m /\ normal_derivation m (s :: Γ) t.
 Proof.
-intros until 0 => H.
+intros * => H.
 inversion_clear H.
 eexists; split; [reflexivity | assumption].
 Qed.
@@ -165,7 +165,7 @@ Lemma substitute_normal_derivation : forall (n : nat) (s : formula) (Γ : list f
 Proof.
 elim /lt_wf_ind.
 
-intros until 0 => IH; intros.
+intros * => IH; intros.
 
 gimme normal_derivation; inversion; cbn.
 (*arr*)
@@ -238,7 +238,7 @@ Lemma normal_weakening : ∀ (n : nat) (Γ Δ: list formula),
   (∀ (s : formula), In s Γ → In s Δ) → forall (t: formula), normal_derivation n Γ t → normal_derivation n Δ t.
 Proof.
 elim.
-intros until 0 => ? ?; inversion.
+intros * => ? ?; inversion.
 
 move => n IH Γ Δ H_in t; inversion.
 (*case arr*)
@@ -258,7 +258,7 @@ Qed.
 Lemma weakening : ∀ (Γ Δ: list formula) (t: formula), 
   derivation Γ t → (∀ (s : formula), In s Γ → In s Δ) → derivation Δ t.
 Proof.
-intros until 0.
+intros *.
 move /normal_derivation_completeness; case.
 eauto using normal_derivation_soundness, normal_weakening.
 Qed.
@@ -278,7 +278,7 @@ elim.
 intros.
 apply: (weakening (Γ := [])) => //.
 (*inductive case*)
-intros until 0 => IH.
+intros * => IH.
 intros until 1 => H'.
 have ? : derivation l (arr a t) by derivation_rule.
 have ? : derivation Δ (arr a t) => //.

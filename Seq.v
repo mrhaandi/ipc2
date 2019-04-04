@@ -40,7 +40,7 @@ Proof. reflexivity. Qed.
 Lemma Forall_app_singleton : forall (T : Type) (P : T -> Prop) (l : list T) (a : T), 
   Forall P (l ++ [a]) <-> Forall P l /\ (P a).
 Proof.
-intros until 0.
+intros *.
 split.
 move /Forall_app.
 intuition.

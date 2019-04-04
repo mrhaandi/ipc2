@@ -19,7 +19,7 @@ Qed.
 Lemma Forall_app (T : Type) (P : T -> Prop) : forall (A B : list T), Forall P (A ++ B) <-> Forall P A /\ Forall P B.
 Proof.
 elim; first by firstorder done.
-intros until 0 => IH.
+intros * => IH.
 intros.
 constructor.
 inversion.

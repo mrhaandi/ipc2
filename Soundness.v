@@ -187,7 +187,7 @@ Qed.
 Lemma derivation_arr_trans : forall (Γ : list formula) (s t u : formula),
   derivation Γ (arr s t) -> derivation Γ (arr t u) -> derivation Γ (arr s u).
 Proof.
-intros until 0 => Hst Htu.
+intros * => Hst Htu.
 apply intro_arr.
 apply inv_arr in Hst.
 apply (weakening (Δ := (s :: Γ))) in Htu; last list_inclusion.
@@ -221,7 +221,7 @@ Qed.
 Lemma interpretation_soundness_arr : forall (s1 s2 : formula) (m1 m2 : nat),
   derivation calC (arr (to_dagger s1) (to_dagger s2)) -> interpretation s1 m1 -> interpretation s2 m2 -> m1 = m2.
 Proof.
-intros until 0 => ? [? ?] [? ?].
+intros * => ? [? ?] [? ?].
 have ? : derivation calC (arr (to_dagger (represent_nat m1)) (to_dagger s2))
 by apply: derivation_arr_trans; eassumption.
 
@@ -430,7 +430,7 @@ Proof.
 have ? := interpretation_one.
 elim /lt_wf_ind => n IH.
 
-intros until 0 => HU HS HP ds ?.
+intros * => HU HS HP ds ?.
 decompose_normal_derivation.
 gimme In; case => [? | H_In].
 subst.

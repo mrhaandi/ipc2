@@ -1,1 +1,13 @@
 -R . IPC2
+./UserTactics.v
+./ListFacts.v
+./MiscFacts.v
+./Seq.v
+./Formula.v
+./FormulaFacts.v
+./Diophantine.v
+./Derivations.v
+./Encoding.v
+./Soundness.v
+./Completeness.v
+./MainResult.v

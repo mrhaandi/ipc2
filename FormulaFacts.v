@@ -58,7 +58,7 @@ Qed.
 Lemma instantiate_prenex_eq : forall (t : formula) (n : nat) (f : nat -> option formula), 
   lc n t -> (forall (m : nat), m < n -> f m = None) -> instantiate_prenex f t = t.
 Proof.
-elim; intros until 0 => IH; intros; simpl; gimme lc; inversion.
+elim; intros * => IH; intros; simpl; gimme lc; inversion.
 (have : f n = None by auto) => ->.
 auto.
 done.
@@ -83,7 +83,7 @@ Qed.
 
 Lemma chain_atom : forall (a b : label) (params : list formula), chain (atom a) b params -> params = [ ] /\ a = b.
 Proof.
-intros until 0.
+intros *.
 inversion; gimme contains; inversion; auto.
 Qed.
 
@@ -122,7 +122,7 @@ done.
 (*case atom*) done.
 (*case arr*) intros; cbn; f_equal; eauto.
 (*case quant*)
-intros until 0 => IH.
+intros * => IH.
 intros until 1 => Hg *; cbn; f_equal.
 apply : IH => //.
 case.
@@ -141,7 +141,7 @@ Lemma contains_to_prenex_instantiation : forall n s t s' t',
 Proof.
 elim.
 (*base case n = 0*)
-intros until 0.
+intros *.
 inversion. intros.
 exists (fun _ => None).
 split.
@@ -149,7 +149,7 @@ apply eq_sym.
 eapply Lc.instantiate_prenex_eq; last done. eassumption. split; [intros; omega | auto].
 (*inductive case n > 0*)
 simpl.
-intros until 0 => IH; intros.
+intros * => IH; intros.
 gimme contains; inversion.
 match goal with | [_ : lc 0 ?s |- _] => rename s into u end. 
 gimme contains; rewrite instantiate_quantification.
@@ -352,21 +352,21 @@ Qed.
 
 Lemma contains_erase_depth : forall s t n, contains_depth n s t -> contains s t.
 Proof.
-intros until 0.
+intros *.
 elim; eauto using contains.
 Qed.
 
 Lemma substitute_contains : forall (s t : formula) (a b: label), 
   contains s t -> contains (substitute_label a b s) (substitute_label a b t).
 Proof.
-intros until 0.
+intros *.
 move /contains_exists_depth => [n ?].
 gimme contains_depth. do 2 (gimme formula). gimme nat.
 elim.
 intros; gimme contains_depth; inversion; eauto using contains.
 
-intros until 0 => IH.
-intros until 0; inversion.
+intros * => IH.
+intros *; inversion.
 cbn.
 gimme lc. move /(lc_substitute a b) => ?.
 apply : contains_trans.
@@ -392,7 +392,7 @@ Qed.
 Lemma substitute_chain : forall (s : formula) (params : list formula) (a b c : label), 
   chain s c params -> chain (substitute_label a b s) (if Label.eqb a c then b else c) (map (substitute_label a b) params).
 Proof.
-intros until 0.
+intros *.
 elim; cbn; intros.
 
 constructor.
