@@ -111,6 +111,32 @@ Definition represent_diophantine_repr (f : nat -> formula) (d : diophantine) : l
   end.
 
 
+Lemma represents_nat_intro : forall (s : formula) (m : nat), s = represent_nat m -> m > 0 -> represents_nat (U s).
+Proof.
+intros. subst. eexists. by split.
+Qed.
+
+
+Lemma encodes_sum_intro : forall (s1 s2 s3 : formula) (m1 m2 m3 : nat), 
+  interpretation s1 m1 -> interpretation s2 m2 -> interpretation s3 m3 -> m1 + m2 = m3 -> encodes_sum (S s1 s2 s3).
+Proof.
+intros.
+do 3 eexists; split; first reflexivity.
+do 3 eexists; do 3 (split; first eassumption).
+done.
+Qed.
+
+
+Lemma encodes_prod_intro : forall (s1 s2 s3 : formula) (m1 m2 m3 : nat), 
+  interpretation s1 m1 -> interpretation s2 m2 -> interpretation s3 m3 -> m1 * m2 = m3 -> encodes_prod (P s1 s2 s3).
+Proof.
+intros.
+do 3 eexists; split; first reflexivity.
+do 3 eexists; do 3 (split; first eassumption).
+done.
+Qed.
+
+
 Lemma lc_represent_diophantines : forall ds, lc (diophantine_variable_bound ds) (represent_diophantines ds).
 Proof.
 elim.

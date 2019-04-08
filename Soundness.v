@@ -384,6 +384,7 @@ Ltac egalize_interpretation :=
     tryif have ? : m1 = m2 by done then fail else have ? := interpretation_soundness H1 H2
   end.
 
+
 Theorem soundness : forall (n : nat) (ΓU ΓS ΓP : list formula), 
   (forall (s : formula), In s ΓU -> represents_nat s) ->
   (forall (s : formula), In s ΓS -> encodes_sum s) ->
@@ -408,12 +409,9 @@ apply /IH; try eassumption + omega.
 
 (*show that S s1 s4 s5 encodes sum*)
 intro; case; last eauto.
-intro; subst.
-do 3 eexists; split; first reflexivity.
-do 3 eexists; do 3 (split; first eassumption).
-lia.
-
+intro; subst. apply : encodes_sum_intro; eassumption + lia.
 (*shown Gamma S inductive case*)
+
 (*NEXT: Gamma U inductive case*)
 case : H_In => [? | H_In]. 
 subst. gimme chain. move /chain_intro_element => [s [? ?]]; subst.
@@ -425,8 +423,6 @@ gimme normal_derivation; inversion.
 pose sm' := represent_nat (Datatypes.S m).
 gimme where normal_derivation. move /(_ (get_label sm')).
 (*simplify goal type*)
-
-
 autorewrite with simplify_formula => ?.
 
 do 3 (gimme normal_derivation; inversion).
@@ -436,10 +432,11 @@ move /(_ ltac:(clear; list_inclusion)).
 apply /IH; first omega.
 1-3 : intro; case; last eauto.
 1-3 : intro; subst.
-exists (Datatypes.S m); split; done + omega.
-1-2 : do 3 eexists; split; first reflexivity.
-1-2 : have ? := interpretation_of_representation (Datatypes.S m).
-1-2 : (do 3 eexists); (do 3 (split; first eassumption)); omega.
+
+apply : represents_nat_intro; [reflexivity | lia].
+apply : encodes_sum_intro; try eassumption + apply : interpretation_of_representation + lia.
+apply : encodes_prod_intro; try eassumption + apply : interpretation_of_representation + lia.
+
 (*shown Gamma U inductive case*)
 (*NEXT: Gamma P inductive case*)
 case : H_In => [? | H_In].
@@ -454,10 +451,7 @@ apply /IH; try eassumption + omega.
 
 (*show that P s1 s4 s5 encodes prod*)
 intro; case; last eauto.
-intro; subst.
-do 3 eexists; split; first reflexivity.
-do 3 eexists; do 3 (split; first eassumption).
-nia.
+intro; subst. apply : encodes_prod_intro; eassumption + nia.
 
 case : H_In => [? | H_In].
 (*lettuce show s_x_d ds*)
