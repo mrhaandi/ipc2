@@ -104,6 +104,7 @@ Ltac generalize_ΓI :=
     end
   end.
 
+
 Lemma get_interpretation : forall (s : formula) (ΓU : list formula),
   (forall {s : formula}, In s ΓU -> represents_nat s) ->
   derivation (ΓU ++ [triangle; a_s; a_p]) (U s) ->
@@ -112,13 +113,9 @@ Proof.
 move => s ΓU HΓU HD.
 decompose_derivation.
 filter_context_chain => ?.
-match goal with [ _ : In ?s ΓU |- _] => have : represents_nat s by auto end.
-move => [m [? ?]]; subst.
+move : (HΓU _ ltac:(eassumption)) => [m [? ?]]; subst.
 exists m; split; last done.
-
-do ? (gimme chain; move /chain_arr => [? [? ?]]).
-gimme chain; move /chain_atom => [? _].
-subst.
+decompose_chain.
 decompose_Forall.
 do 2 generalize_ΓU.
 decompose_derivation.
@@ -147,7 +144,16 @@ decompose_derivation.
 filter_context_chain. exfalso; intuition.
 decompose_Forall.
 decompose_derivation.
-filter_context_chain; try (firstorder done).
+filter_context_chain; (firstorder done).
+Qed.
+
+
+Lemma derivation_represent_nat_eq : forall (m1 m2 : nat), 
+  derivation calC (Formula.arr (to_dagger (represent_nat m1)) (to_dagger (represent_nat m2))) -> m1 = m2.
+Proof.
+intros.
+suff : get_label (represent_nat m1) = get_label (represent_nat m2) by case.
+apply: derivation_atom_eq => //; firstorder done.
 Qed.
 
 
@@ -197,39 +203,19 @@ Qed.
 
 Lemma interpretation_soundness : forall (s : formula) (m1 m2 : nat), interpretation s m1 -> interpretation s m2 -> m1 = m2.
 Proof.
-intros s m1 m2 Hm1 Hm2.
-inversion_clear Hm1 as [_ Hm1_2].
-inversion_clear Hm2 as [Hm2_1 _].
-have H : derivation calC (arr (to_dagger (represent_nat m1)) (to_dagger (represent_nat m2))).
-apply: intro_arr.
-set t := to_dagger (represent_nat m2) in Hm2_1 *.
-set u := to_dagger (represent_nat m1) in Hm1_2 *.
-set s' := (to_dagger s) in Hm2_1 Hm1_2 *.
-have Hu : derivation (u :: calC) u by derivation_rule.
-have Hus' : derivation (u :: calC) (arr u s').
-apply: (weakening (Γ := calC)) => //. intuition.
-have Hs't : derivation (u :: calC) (arr s' t).
-apply: (weakening (Γ := calC)) => //. intuition.
-have Hs' : derivation (u :: calC) s' by derivation_rule.
-by derivation_rule.
-clear s Hm1_2 Hm2_1.
-suff : (1, m1) = (1, m2) by case.
-apply: derivation_atom_eq H; firstorder done.
+move => s m1 m2 [_ Hm1_2] [Hm2_1 _].
+move : (derivation_arr_trans Hm1_2 Hm2_1).
+by move /derivation_represent_nat_eq.
 Qed.
 
 
 Lemma interpretation_soundness_arr : forall (s1 s2 : formula) (m1 m2 : nat),
   derivation calC (arr (to_dagger s1) (to_dagger s2)) -> interpretation s1 m1 -> interpretation s2 m2 -> m1 = m2.
 Proof.
-intros * => ? [? ?] [? ?].
-have ? : derivation calC (arr (to_dagger (represent_nat m1)) (to_dagger s2))
-by apply: derivation_arr_trans; eassumption.
-
-have ? : derivation calC (arr (to_dagger (represent_nat m1)) (to_dagger (represent_nat m2)))
-by apply: derivation_arr_trans; eassumption.
-
-suff : get_label (represent_nat m1) = get_label (represent_nat m2) by case.
-apply: derivation_atom_eq => //; firstorder done.
+intros * => s1s2 [_ m1s1] [s2m2 _].
+move : (derivation_arr_trans m1s1 s1s2) => m1s2.
+move : (derivation_arr_trans m1s2 s2m2).
+by move /derivation_represent_nat_eq.
 Qed.
 
 
@@ -243,32 +229,22 @@ intros until 3 => Hs1 Hs2 Hs3 HD.
 decompose_derivation.
 filter_context_chain => Hc.
 match goal with [ _ : In ?s ΓS |- _] => have : encodes_sum s by auto end.
-move => [s1' [s2' [s3' [?]]]].
-subst; decompose_chain.
+move => [s1' [s2' [s3' [?]]]] [m1' [m2' [m3' [Hs1' [Hs2' [Hs3' ?]]]]]].
+subst. decompose_chain.
 decompose_Forall.
 do ? (generalize_ΓS).
 
 decompose_derivation.
 do ? (filter_context_chain).
 decompose_Forall.
-have Hs1s1' : derivation calC (arr (to_dagger s1') (to_dagger s1)).
-apply intro_arr.
-apply: (context_generalization); [eassumption | by intros; filter_context_derivation].
 
-have Hs2s2' : derivation calC (arr (to_dagger s2') (to_dagger s2)).
-apply intro_arr. 
-apply: (context_generalization); [eassumption | by intros; filter_context_derivation].
+do 3 (gimme derivation).
+do 3 (move /intro_arr => ?).
+suff : m1' = m1. suff : m2' = m2. suff : (m1' + m2') = m3.
+intros. by subst.
 
-have Hs3s3' : derivation calC (arr (to_dagger s3') (to_dagger s3)).
-apply intro_arr. 
-apply: (context_generalization); [eassumption | by intros; filter_context_derivation].
-
-move => [m1' [m2' [m3' [Hs1' [Hs2' [Hs3' ?]]]]]].
-
-have ? : m1' = m1 by apply: (interpretation_soundness_arr Hs1s1'); assumption.
-have ? : m2' = m2 by apply: (interpretation_soundness_arr Hs2s2'); assumption.
-have ? : m3' = m3 by apply: (interpretation_soundness_arr Hs3s3'); assumption.
-by subst.
+all: apply: (interpretation_soundness_arr); try eassumption.
+all: apply: (context_generalization); [eassumption | by intros; filter_context_derivation].
 Qed.
 
 
@@ -282,33 +258,22 @@ intros until 3 => Hs1 Hs2 Hs3 HD.
 decompose_derivation.
 filter_context_chain => Hc.
 match goal with [ _ : In ?s ΓP |- _] => have : encodes_prod s by auto end.
-move => [s1' [s2' [s3' [?]]]].
-subst.
-decompose_chain.
+move => [s1' [s2' [s3' [?]]]] [m1' [m2' [m3' [Hs1' [Hs2' [Hs3' ?]]]]]].
+subst. decompose_chain.
 decompose_Forall.
 do ? (generalize_ΓP).
 
 decompose_derivation.
 do ? (filter_context_chain).
 decompose_Forall.
-have Hs1s1' : derivation calC (arr (to_dagger s1') (to_dagger s1)).
-apply intro_arr.
-apply: (context_generalization); [eassumption | by intros; filter_context_derivation].
 
-have Hs2s2' : derivation calC (arr (to_dagger s2') (to_dagger s2)).
-apply intro_arr. 
-apply: (context_generalization); [eassumption | by intros; filter_context_derivation].
+do 3 (gimme derivation).
+do 3 (move /intro_arr => ?).
+suff : m1' = m1. suff : m2' = m2. suff : (m1' * m2') = m3.
+intros. by subst.
 
-have Hs3s3' : derivation calC (arr (to_dagger s3') (to_dagger s3)).
-apply intro_arr. 
-apply: (context_generalization); [eassumption | by intros; filter_context_derivation].
-
-move => [m1' [m2' [m3' [Hs1' [Hs2' [Hs3' ?]]]]]].
-
-have ? : m1' = m1 by apply: (interpretation_soundness_arr Hs1s1'); assumption.
-have ? : m2' = m2 by apply: (interpretation_soundness_arr Hs2s2'); assumption.
-have ? : m3' = m3 by apply: (interpretation_soundness_arr Hs3s3'); assumption.
-by subst.
+all: apply: (interpretation_soundness_arr); try eassumption.
+all: apply: (context_generalization); [eassumption | by intros; filter_context_derivation].
 Qed.
 
 

@@ -31,7 +31,7 @@ Ltac derivation_rule := first
   | ( do ? (apply intro_quant => //=; intro);
       do ? (apply intro_arr);
       apply ax => //; by list_element)
-  | match goal with | [H : In ?s ?Γ |- derivation _ ?s] => apply ax; list_inclusion end
+  (*| match goal with | [H : In ?s ?Γ |- derivation _ ?s] => apply ax; list_inclusion end (*slow, unnecessary*)*)
   | (by (eauto using derivation))].
 
 
