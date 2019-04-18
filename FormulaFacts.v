@@ -25,10 +25,10 @@ Qed.
 Lemma relax : forall (s : formula) (n m : nat), lc n s -> n <= m -> lc m s.
 Proof.
 elim; intros.
-gimme lc; inversion; constructor; omega.
+grab lc; inversion; constructor; omega.
 constructor.
-gimme lc; inversion; constructor; eauto.
-gimme lc; inversion; constructor; eapply H. eassumption. omega.
+grab lc; inversion; constructor; eauto.
+grab lc; inversion; constructor; eapply H. eassumption. omega.
 Qed.
 
 Lemma instantiate_pred : forall s t n, lc (1 + n) s -> lc 0 t -> lc n (instantiate t n s).
@@ -37,7 +37,7 @@ elim.
 (*case var*)
 move => n t m; intros.
 simpl.
-gimme shape (lc (1 + m) _) => H_lc; inversion H_lc.
+grab shape (lc (1 + m) _) => H_lc; inversion H_lc.
 subst.
 have : n = m \/ n < m by omega.
 case; intros; inspect_eqb.
@@ -47,18 +47,18 @@ by constructor.
 intros; constructor.
 (*case arr*)
 intros. simpl.
-gimme shape (lc _ (arr _ _)). inversion.
+grab shape (lc _ (arr _ _)). inversion.
 constructor; auto.
 (*case quant*)
 intros. simpl.
-gimme shape (lc _ (quant _)); inversion.
+grab shape (lc _ (quant _)); inversion.
 constructor. auto.
 Qed.
 
 Lemma instantiate_prenex_eq : forall (t : formula) (n : nat) (f : nat -> option formula), 
   lc n t -> (forall (m : nat), m < n -> f m = None) -> instantiate_prenex f t = t.
 Proof.
-elim; intros * => IH; intros; simpl; gimme lc; inversion.
+elim; intros * => IH; intros; simpl; grab lc; inversion.
 (have : f n = None by auto) => ->.
 auto.
 done.
@@ -70,6 +70,14 @@ intros.
 revert dependent m.
 case; eauto with arith.
 Qed.
+
+Lemma bind_succ : forall a t n, lc n t -> lc (1+n) (bind a n t).
+Proof.
+move => a. elim; cbn.
+all: intros; grab lc; inversion; f_equal; try (constructor; auto).
+match goal with [|-context[if ?H then _ else _]] => case : H end.
+all: by constructor.
+Qed.
 End Lc.
 
 
@@ -77,14 +85,14 @@ Lemma chain_arr : forall (s t : formula) (params : list formula) (a : label), ch
   exists (ss : list formula), params = s :: ss /\ chain t a ss.
 Proof.
 move => s t params a.
-case; intros; gimme contains; inversion; eauto.
+case; intros; grab contains; inversion; eauto.
 Qed.
 
 
 Lemma chain_atom : forall (a b : label) (params : list formula), chain (atom a) b params -> params = [ ] /\ a = b.
 Proof.
 intros *.
-inversion; gimme contains; inversion; auto.
+inversion; grab contains; inversion; auto.
 Qed.
 
 
@@ -102,8 +110,8 @@ Qed.
 
 Lemma quantified_arrow_not_contains_atom : forall n s t a, contains (quantify_formula n (arr s t)) (atom a) -> False.
 Proof.
-elim; simpl; intros; gimme contains; inversion.
-gimme contains; rewrite instantiate_quantification; eauto.
+elim; simpl; intros; grab contains; inversion.
+grab contains; rewrite instantiate_quantification; eauto.
 Qed.
 
 
@@ -150,9 +158,9 @@ eapply Lc.instantiate_prenex_eq; last done. eassumption. split; [intros; omega |
 (*inductive case n > 0*)
 simpl.
 intros * => IH; intros.
-gimme contains; inversion.
+grab contains; inversion.
 match goal with | [_ : lc 0 ?s |- _] => rename s into u end. 
-gimme contains; rewrite instantiate_quantification.
+grab contains; rewrite instantiate_quantification.
 (have : n + 0 = n by omega) => ->.
 (*have : n + 0 = n by omega.*)
 simpl.
@@ -282,7 +290,7 @@ elim; cbn.
 (*case var*) auto.
 (*case atom*) intros; rewrite if_fun; constructor.
 (*case arr/quant*)
-all : intros; gimme lc; inversion; eauto using lc.
+all : intros; grab lc; inversion; eauto using lc.
 Qed.
 
 Lemma rename_instantiation : forall (s : formula) (n : nat) (a b : label),
@@ -292,7 +300,7 @@ elim; cbn.
 intros.
 case : (n0 =? n); cbn; try (rewrite -> (iffRL (Label.eqb_eq _ _))); auto.
 
-all: intros; gimme fresh_in; inversion.
+all: intros; grab fresh_in; inversion.
 
 rewrite -> Label.neq_neqb; auto.
 
@@ -316,17 +324,17 @@ intros.
 cbn.
 rewrite if_fun.
 cbn.
-gimme fresh_in; inversion.
+grab fresh_in; inversion.
 case : (Label.eqb a l); rewrite -> Label.neq_neqb; auto.
 
 (*case arr*)
 intros.
-gimme shape (fresh_in c (arr _ _)); inversion.
+grab shape (fresh_in c (arr _ _)); inversion.
 cbn; f_equal; eauto.
 
 (*case quant*)
 intros.
-gimme shape (fresh_in c (quant _)); inversion.
+grab shape (fresh_in c (quant _)); inversion.
 cbn; f_equal; eauto.
 Qed.
 
@@ -361,14 +369,14 @@ Lemma substitute_contains : forall (s t : formula) (a b: label),
 Proof.
 intros *.
 move /contains_exists_depth => [n ?].
-gimme contains_depth. do 2 (gimme formula). gimme nat.
+grab contains_depth. do 2 (grab formula). grab nat.
 elim.
-intros; gimme contains_depth; inversion; eauto using contains.
+intros; grab contains_depth; inversion; eauto using contains.
 
 intros * => IH.
 intros *; inversion.
 cbn.
-gimme lc. move /(lc_substitute a b) => ?.
+grab lc. move /(lc_substitute a b) => ?.
 apply : contains_trans.
 eassumption.
 rewrite substitute_instantiation.
@@ -396,12 +404,12 @@ intros *.
 elim; cbn; intros.
 
 constructor.
-gimme contains; move /(substitute_contains a b).
+grab contains; move /(substitute_contains a b).
 rewrite <- if_fun.
 apply.
 
 apply : (chain_cons (u := substitute_label a b u)).
-gimme contains; apply /(substitute_contains a b).
+grab contains; apply /(substitute_contains a b).
 assumption.
 Qed.
 
@@ -410,7 +418,7 @@ Lemma substitute_fresh_label : forall (s : formula) (a b : label),
 Proof.
 elim; cbn.
 auto.
-all : intros; gimme fresh_in; inversion; (try (f_equal; auto)).
+all : intros; grab fresh_in; inversion; (try (f_equal; auto)).
 rewrite -> Label.neq_neqb => //.
 Qed.
 

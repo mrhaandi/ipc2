@@ -8,15 +8,20 @@ Proof.
 auto with *.
 Qed.
 
+Section ForallFacts.
 
-Lemma Forall_tl (T : Type) (P : T -> Prop) : forall (ss : list T), Forall P ss -> Forall P (tl ss).
+Variable T : Type.
+Variable P : T -> Prop.
+
+
+Lemma Forall_tl : forall (ss : list T), Forall P ss -> Forall P (tl ss).
 Proof.
 case => //.
-intros; gimme Forall; inversion; assumption.
+intros; grab Forall; inversion; assumption.
 Qed.
 
 
-Lemma Forall_app (T : Type) (P : T -> Prop) : forall (A B : list T), Forall P (A ++ B) <-> Forall P A /\ Forall P B.
+Lemma Forall_app_iff : forall (A B : list T), Forall P (A ++ B) <-> Forall P A /\ Forall P B.
 Proof.
 elim; first by firstorder done.
 intros * => IH.
@@ -31,20 +36,23 @@ firstorder (by constructor).
 Qed.
 
 
-Lemma Forall_cons : forall (T : Type) (P : T -> Prop) (A : list T) (a : T),
-  Forall P (a :: A) -> P a /\ Forall P A.
+Lemma Forall_cons_iff : forall (l : list T) (a : T),
+  Forall P (a :: l) <-> P a /\ Forall P l.
 Proof.
-intros; gimme Forall; inversion; auto.
+intros. split.
+by inversion.
+case. intros. by constructor.
 Qed.
 
-
-Lemma Forall_In : forall (T : Type) (P : T -> Prop) (A : list T) (a : T), In a A -> Forall P A -> P a.
+Lemma Forall_In : forall (A : list T) (a : T), In a A -> Forall P A -> P a.
 Proof.
-move => T P.
 elim => [a | b A IH a]; first case.
 move /in_cons_iff.
-case => [-> | ?]; move /Forall_cons => [? ?]; auto.
+case => [-> | ?]; move /Forall_cons_iff => [? ?]; auto.
 Qed.
+
+End ForallFacts.
+
 
 
 Lemma Forall_flat_map (T U: Type) (P : T -> Prop) : forall (ds : list U) (f : U -> list T) (d : U), 
@@ -53,7 +61,7 @@ Proof.
 elim; first done.
 cbn.
 intros.
-gimme Forall; move /Forall_app => [? ?].
+grab Forall; move /Forall_app_iff => [? ?].
 firstorder (subst; done).
 Qed.
 
@@ -64,7 +72,7 @@ Ltac decompose_Forall :=
   match goal with
   | [H : Forall _ (_ :: _) |- _] => inversion_clear H
   | [H : Forall _ nil |- _] => inversion_clear H
-  | [H : Forall _ (_ ++ _) |- _] => move /Forall_app : H => [? ?]
+  | [H : Forall _ (_ ++ _) |- _] => move /Forall_app_iff : H => [? ?]
   end).
 
 
@@ -108,6 +116,11 @@ Proof.
 auto.
 Qed.
 
+
+
+
+
+
 Lemma Forall_exists_monotone : forall (A : Type) (P : nat -> A -> Prop) (l : list A), 
   (forall (n m : nat) (a : A), P n a -> n <= m -> P m a) -> Forall (fun (a : A) => exists (n : nat), P n a) l ->
   exists (n : nat), Forall (P n) l.
@@ -117,8 +130,8 @@ move => A P l H. elim : l.
 intros; exists 0; auto.
 
 move => a l IH; inversion.
-gimme Forall. move /IH.
-gimme where P; move => [n1 ?].
+grab Forall. move /IH.
+grab where P; move => [n1 ?].
 move => [n2 ?].
 exists (n1+n2); constructor.
 apply : H; [eassumption | omega].
@@ -126,10 +139,7 @@ apply : Forall_impl; last eassumption.
 intros; apply : H; [eassumption | omega].
 Qed.
 
-Lemma Forall_cons_iff : forall (T : Type) (P : T -> Prop) (l : list T) (a : T),
-  Forall P (a :: l) <-> P a /\ Forall P l.
-Proof.
-intros. split.
-inversion. auto.
-case. intros. by constructor.
-Qed.
+
+
+
+

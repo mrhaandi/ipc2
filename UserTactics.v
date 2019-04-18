@@ -1,5 +1,13 @@
-Load Common.
+(*common header begin*)
+Require Import Utf8.
+From Coq Require Import ssreflect ssrfun ssrbool.
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+Set Maximal Implicit Insertion.
+(*common header end*)
 
+Require Import Arith.
 Require Import Psatz. (*lia : linear integer arithmetic, nia : non-linear integer arithmetic*)
 
 
@@ -10,24 +18,11 @@ Ltac decompose_or tactic :=
   end.
 
 (*does not touch existing evars*)
-Tactic Notation "gimme" "shape" open_constr(p) := 
+Tactic Notation "grab" "shape" open_constr(p) := 
 lazymatch goal with
 | [H : p |- _] => let t := type of H in 
   tryif has_evar t then fail else unify p t; move : H
 end.
-
-(*
-(*uses documented uconstr but weird trickery*)
-Ltac gimme_tac shape :=
-let e := fresh in
-refine (let e := shape in _);
-let v := eval red in e in clear e;
-match goal with H : ?C |- _ =>
-unify v C; move : H
-end.
-
-Tactic Notation "gimme" uconstr(shape) := gimme_tac shape.
-*)
 
 (*idtac if p is the prefix of q otherwise fail*)
 Ltac is_prefix p q :=
@@ -36,25 +31,26 @@ Ltac is_prefix p q :=
   | (?r _) => is_prefix p r
   end.
 
-(*reverts assumption with head p*)
-Tactic Notation "gimme" constr(p) :=
-  lazymatch goal with 
-  | [ H : p _ _ _ _ _ _ _  |- _] => move : H
-  | [ H : p _ _ _ _ _ _  |- _] => move : H
-  | [ H : p _ _ _ _ _  |- _] => move : H
-  | [ H : p _ _ _ _  |- _] => move : H
-  | [ H : p _ _ _  |- _] => move : H
-  | [ H : p _ _  |- _] => move : H
-  | [ H : p _  |- _] => move : H
-  | [ H : p  |- _] => move : H
+(*idtac if q => (_ -> ... -> (p _ .. _)) otherwise fail*)
+Ltac results_in p q :=
+  lazymatch q with
+  | p => idtac
+  | (_ -> ?r) => results_in p r
+  | (?r _) => results_in p r
+  end.
+
+(*reverts hypothesis starting with p and containing q*)
+Tactic Notation "grab" constr(p) := 
+  match goal with [H : ?t |- _] => 
+    tryif (results_in p t) then move : H else fail
   end.
 
 (*reverts assumption containing p*)
-Tactic Notation "gimme" "where" constr(p) :=
+Tactic Notation "grab" "where" constr(p) :=
   match goal with [H : context[p] |- _] => move : H end.
 
 (*reverts hypothesis starting with p and containing q*)
-Tactic Notation "gimme" constr(p) "where" constr(q) := 
+Tactic Notation "grab" constr(p) "where" constr(q) := 
   match goal with [H : context[q] |- _] => 
     let t := type of H in tryif (is_prefix p t) then move : H else fail
   end.
@@ -65,16 +61,7 @@ Tactic Notation "inversion" := let H := fresh "top" in
   subst; (*do ? (match goal with [E : ?t = ?u |- _] => is_var u; tryif is_var t then subst t else subst u end); (*propagate substitutions*)*)
   do ? (match goal with [E : unkeyed ?e |- _] => change e in E end). (*restore equalities*)
 
-Tactic Notation "move" "//" := 
-  let H := fresh in move => H; 
-  match goal with 
-    | [|- _ -> _] => move /(H) 
-    | [|- forall _, _] => let a := fresh in move => a; move : (H a); (try clear a)
-  end; clear H.
 
-Tactic Notation "move" "\\" :=
-  let H1 := fresh in let H2 := fresh in move => H1 H2; move : H2 H1; move //.
-  
 (*smarter to autorewrite? what happens under binders?*)
 Ltac inspect_eqb := try (
   match goal with

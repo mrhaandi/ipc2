@@ -76,7 +76,7 @@ Inductive fresh_in (a: label) : formula -> Prop :=
   | fresh_in_arr : forall (s t: formula), fresh_in a s -> fresh_in a t -> fresh_in a (arr s t)
   | fresh_in_quant : forall (s: formula), fresh_in a s -> fresh_in a (quant s).
 
-(*
+
 (*replace free occurrences of a in t by index n*)
 Fixpoint bind (a: label) (n : nat) (t : formula) : formula :=
   match t with
@@ -86,7 +86,7 @@ Fixpoint bind (a: label) (n : nat) (t : formula) : formula :=
     | (quant t) => quant (bind a (S n) t)
   end.
 
-
+(*
 (*replace all occurrences of atom a by s in t*)
 Fixpoint substitute (a : label) (s t : formula) : formula :=
   match t with

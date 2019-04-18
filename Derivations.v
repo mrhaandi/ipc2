@@ -43,12 +43,12 @@ elim; intros *.
 inversion.
 
 move => IH Γ *.
-gimme normal_derivation; inversion; try derivation_rule.
+grab normal_derivation; inversion; try derivation_rule.
 
 (*atom case*)
-gimme In; move /ax.
-gimme Forall;
-gimme chain; elim.
+grab In; move /ax.
+grab Forall;
+grab chain; elim.
 
 (*zero step chain*) derivation_rule.
 (*multistep chain*) move => ? ? t u *.
@@ -155,7 +155,7 @@ Ltac decompose_lc :=
     end
   end).
 
-Tactic Notation "gimme" "where" constr(p) := 
+Tactic Notation "grab" "where" constr(p) := 
   lazymatch goal with
   | [H : context[p] |- _] => move : H
   end.
@@ -167,7 +167,7 @@ elim /lt_wf_ind.
 
 intros * => IH; intros.
 
-gimme normal_derivation; inversion; cbn.
+grab normal_derivation; inversion; cbn.
 (*arr*)
 apply : derive_arr.
 rewrite <- map_cons.
@@ -181,7 +181,7 @@ intro; subst c.
 have [d Hd] := exists_fresh ([atom a; atom b; s] ++ (map (substitute_label a b) Γ)).
 decompose_Forall.
 
-do 2 (gimme shape (fresh_in d (atom _)); inversion).
+do 2 (grab shape (fresh_in d (atom _)); inversion).
 rewrite -> (@instantiate_renaming_eq _ _ _ d); auto.
 rewrite -> (@map_substitute_fresh_label d a (map (substitute_label a b) Γ)); auto.
 
@@ -200,7 +200,7 @@ have ? : In s' Γ' by apply : in_map; assumption.
 have ? : chain s' a' params' by apply : substitute_chain; assumption.
 
 have ? : Forall (normal_derivation n0 Γ') params'.
-gimme Forall; move : IH; clear; revert dependent params.
+grab Forall; move : IH; clear; revert dependent params.
 elim; cbn; first done.
 
 intros; decompose_Forall.
@@ -216,7 +216,7 @@ Proof.
 intros.
 have : Γ = map (substitute_label a b) Γ by apply map_substitute_fresh_label.
 move => ->.
-gimme derivation; move /normal_derivation_completeness => [? ?].
+grab derivation; move /normal_derivation_completeness => [? ?].
 eauto using normal_derivation_soundness, substitute_normal_derivation.
 Qed.
 
@@ -228,7 +228,7 @@ Theorem intro_quant_fresh : ∀ (s: formula) (Γ : list formula) (a : label),
 Proof.
 move => s Γ a H *.
 apply intro_quant => b.
-gimme derivation.
+grab derivation.
 move /(substitute_derivation_bindable b H).
 rewrite -> rename_instantiation; auto.
 Qed.
