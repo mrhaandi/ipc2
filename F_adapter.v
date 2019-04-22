@@ -234,7 +234,6 @@ Lemma f_to_ipc : forall t (ty : typ) Gamma,
  exists n, normal_derivation n Gamma (typ_to_formula 0 ty).
 *)
 
-
 Lemma in_to_index : forall t Gamma, In t Gamma -> exists i, forall labeling n, ctxindex (map (fun t => Some (formula_to_typ labeling n t)) Gamma) i (formula_to_typ labeling n t).
 Proof.
 move => t. elim => //.
@@ -244,6 +243,53 @@ case /in_cons_iff.
 move => ?. subst. by exists 0.
 
 move /IH => [n ?]. by exists (1+n).
+Qed.
+
+
+Lemma formula_to_typ_injective : forall labeling s t n, injective labeling -> lc n s -> lc n t -> formula_to_typ labeling n t = formula_to_typ labeling n s -> s = t.
+Proof.
+move => labeling s t n Hl.
+elim : s t n => /=.
+
+{
+move => x. case => //=.
+move => ? ? _ _. case => ?. f_equal. done.
+move => ? ?. inversion. inversion. case => ?. unfoldN. lia.
+}
+
+{
+move => a. case => //=.
+move => ? ?. inversion. inversion. case => ?. unfoldN. lia.
+move => b ? _ _. case => ?.
+have : labeling a = labeling b by unfoldN; lia.
+move /Hl => ?. f_equal. done.
+}
+
+{
+move => s1 IHs1 s2 IHs2. case => //=.
+intros *. inversion. inversion. inversion. f_equal; eauto.
+}
+
+{
+move => s IH. case => //=.
+intros *. inversion. inversion. inversion. f_equal. eauto.
+}
+Qed.
+
+
+Lemma index_to_in : forall t Gamma i labeling n, injective labeling -> Forall (lc n) Gamma -> lc n t -> ctxindex (map (fun t => Some (formula_to_typ labeling n t)) Gamma) i (formula_to_typ labeling n t) -> In t Gamma.
+Proof.
+move => t. elim => //=.
+case => //=.
+
+move => s Gamma IH.
+case => //=.
+
+intros * => ?. case => ? ? ?. move /eqP. case.
+move /formula_to_typ_injective. auto.
+
+intros * => ?. case => ? ? ?.
+move /IH. auto.
 Qed.
 
 (*
@@ -542,7 +588,170 @@ Qed.
 
 Print Assumptions iipc2_to_f.
 
+(*chain s a params morally means that s can be instanciated as p1 -> ... -> pn -> a*)
+Inductive partial_chain (s t : formula) : list formula -> Prop :=
+  | partial_chain_nil : contains s t -> partial_chain s t List.nil
+  | partial_chain_cons : forall (s' t': formula) (ts: list formula), contains s (arr s' t') -> partial_chain t' t ts -> partial_chain s t (s' :: ts).
+
+
+Lemma typ_to_formula : forall ty labeling n, bijective labeling -> exists t, ty = (formula_to_typ labeling n t) /\ lc n t.
+Proof.
+elim => /=.
+move => x labeling n. case => l_inv. rewrite /cancel => _ Hl_inv.
+have : (x < n)%coq_nat \/ (x >= n)%coq_nat by lia.
+case => ?.
+exists (Formula.var x). split; by constructor.
+exists (Formula.atom (l_inv (x-n))) => /=. split; last constructor. f_equal. rewrite Hl_inv. unfoldN. lia.
+
+move => tyl IHs tyr IHt *.
+move : (IHs ltac:(assumption) ltac:(assumption) ltac:(assumption)) => [s [-> ?]].
+move : (IHt ltac:(assumption) ltac:(assumption) ltac:(assumption)) => [t [-> ?]].
+exists (Formula.arr s t). split; by constructor.
+
+move => ty IH ? n *.
+move : (IH ltac:(assumption) (n.+1) ltac:(assumption)) => [t [-> ?]].
+exists (Formula.quant t). split; by constructor.
+Qed.
+
+
+Lemma partial_chain_arr : forall ts s t u, partial_chain s (arr t u) ts -> partial_chain s u (ts ++ [::t]).
+Proof.
+elim.
+intros until 0; inversion.
+apply : partial_chain_cons; try eassumption + constructor.
+constructor.
+
+move => t' ts IH.
+intros until 0; inversion.
+apply : partial_chain_cons; try eassumption.
+by apply IH.
+Qed.
+
+Lemma contains_transitivity : forall s t u, contains s t -> contains t u -> contains s u.
+Proof.
+intros until 0; elim => //.
+intros; apply : contains_trans; eauto.
+Qed.
+
+Lemma partial_chain_contains : forall s t t' ts, partial_chain s t ts -> contains t t' -> partial_chain s t' ts.
+Proof.
+intros *.
+elim => *.
+constructor. apply : contains_transitivity; eauto.
+apply : partial_chain_cons; eauto.
+Qed.
+
+Lemma shift_formula_to_typ labeling : forall t n m, lc m t -> shift_typ n m (formula_to_typ labeling m t) = formula_to_typ labeling (m+n) t.
+Proof.
+elim => /=.
+intros *. inversion. by inspect_eqn2.
+intros * => _. inspect_eqn2. f_equal. unfoldN. lia.
+intros. grab lc. inversion. f_equal; auto.
+intros. grab lc. inversion. f_equal.
+have : (m + n).+1 = (m.+1 + n) by unfoldN; lia. move => ->. auto.
+Qed.
+
+Lemma formula_to_typ_instantiate : forall u ty labeling, injective labeling -> ty = formula_to_typ labeling 0 u -> forall s n t, lc (n.+1) s -> lc n t ->
+  formula_to_typ labeling n t = subst_typ_1 n ty (formula_to_typ labeling (n.+1) s) ->
+  instantiate u n s = t.
+Proof.
+move => u ty labeling Hl ?. elim => /=.
+
+move => x n t. inversion. move => ?.
+have : (x = n) \/ (x < n)%coq_nat by lia.
+case => ?.
+subst. inspect_eqn2. inspect_eqb.
+rewrite shift_formula_to_typ. cbn.
+apply /formula_to_typ_injective => //.
+admit. admit. (*doable? - maybe NOT*)
+do ? inspect_eqn2. inspect_eqb.
+revert dependent t. case => //=.
+move => ? ?. case. intros. by subst.
+move => ? ?. case. intros. unfoldN. lia.
+
+move => a n t _ ?. do ? inspect_eqn2.
+revert dependent t. case => //=.
+move => ?. inversion. case => ?. unfoldN. lia.
+move => b _. case => ?. f_equal. apply : Hl. unfoldN. lia.
+
+move => s1 IHs1 s2 IHs2 n t. inversion.
+case : t => //= => t1 t2. inversion.
+case => ? ?. f_equal; eauto.
+
+move => s IHs n t. inversion.
+case : t => //= => t. inversion.
+case => ?. f_equal; eauto.
+Admitted.
+
+
+
 
 (*NEXT: if there is a derivation, then there is a ipc2 long derivation*)
+Lemma f_hf_to_partial_chain : forall labeling, bijective labeling -> forall M Gamma t, 
+  Forall well_formed_formula Gamma -> well_formed_formula t -> head_form M -> (Some (formula_to_typ labeling 0 t) == typing (map (fun t => Some (formula_to_typ labeling 0 t)) Gamma) M) ->
+  exists s ts, In s Gamma /\ partial_chain s t ts /\ 
+    (List.Forall (fun t' => exists M', normal_form M' /\ term_size M' < term_size M /\ (Some (formula_to_typ labeling 0 t') == typing (map (fun t => Some (formula_to_typ labeling 0 t)) Gamma) M')) ts).
+Proof.
+move => labeling Hl.
+elim /term_size_ind.
+move => M IH Gamma t ? ?. inversion.
 
+(*var case*)
+{
+rewrite typing_varE. move /index_to_in.
+move /(_ ltac:(auto using bij_inj) ltac:(assumption) ltac:(assumption)) => ?.
+eexists. exists [::]. split; first eassumption.
+split; do ? constructor.
+}
+
+(*app case*)
+{
+move /typing_appP => [tyl].
+have [s [-> ?]] := (@typ_to_formula tyl labeling 0 ltac:(assumption)).
+move /(@IH _ _ _ (Formula.arr s t)) => /=.
+move /(_ ltac:(unfoldN; lia) ltac:(assumption) ltac:(by constructor) ltac:(assumption)).
+move => [s' [ts' [? [? ?]]]] ?.
+exists s', (ts' ++ [::s]). split; first done.
+split. by apply : partial_chain_arr.
+rewrite Forall_app_iff. split.
+grab List.Forall. apply : List.Forall_impl.
+clear => t [M [? [? ?]]].
+exists M. split; first done.
+split; last done. apply /leP. unfoldN. lia.
+
+constructor; last done.
+eexists. split; first eassumption. 
+split; last done. apply /leP. unfoldN. lia.
+}
+
+(*TODO uapp case*)
+{
+move /typing_uappP => [tyl]. rewrite subst_typ_to_subst_typ_1.
+have [s' [-> ?]] := (@typ_to_formula tyl labeling 1 ltac:(assumption)).
+move => ?.
+move /(@IH _ _ _ (Formula.quant s')) => /=.
+move /(_ ltac:(unfoldN; lia) ltac:(assumption) ltac:(by constructor) ltac:(assumption)).
+move => [s'' [ts'' [? [? ?]]]].
+exists s'', ts''. split; first done.
+split.
+apply : partial_chain_contains; eauto.
+(*apply : contains_trans.*)
+ admit. (*doable*)
+
+
+
+
+grab List.Forall. apply : List.Forall_impl.
+clear => t [M [? [? ?]]].
+exists M. split; first done.
+split; last done. apply /leP. unfoldN. lia.
+}
+Admitted.
+
+
+(*NEXT: if there is a derivation, then there is a ipc2 long derivation*)
+Lemma f_to_normal_derivation : forall Gamma t M labeling, injective labeling -> 
+  (Some (formula_to_typ labeling 0 t) == typing (map (fun t => Some (formula_to_typ labeling 0 t)) Gamma) M) ->
+  exists d, normal_derivation d Gamma t.
+Proof.
 
