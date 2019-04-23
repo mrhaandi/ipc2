@@ -42,7 +42,7 @@ Inductive normal_form : term -> Prop :=
 with head_form : term -> Prop :=
   | hf_var : forall n, head_form (var n)
   | hf_app : forall t1 t2, head_form t1 -> normal_form t2 -> head_form (app t1 t2)
-  | hf_uapp : forall t1 s, head_form t1 -> head_form (uapp t1 s).
+  | hf_uapp : forall t1 ty, head_form t1 -> head_form (uapp t1 ty).
 
 Fixpoint is_abs (t : term) : bool :=
   match t with
@@ -651,6 +651,7 @@ intros. grab lc. inversion. f_equal.
 have : (m + n).+1 = (m.+1 + n) by unfoldN; lia. move => ->. auto.
 Qed.
 
+(*
 Lemma formula_to_typ_instantiate : forall u ty labeling, injective labeling -> ty = formula_to_typ labeling 0 u -> forall s n t, lc (n.+1) s -> lc n t ->
   formula_to_typ labeling n t = subst_typ_1 n ty (formula_to_typ labeling (n.+1) s) ->
   instantiate u n s = t.
@@ -682,7 +683,7 @@ move => s IHs n t. inversion.
 case : t => //= => t. inversion.
 case => ?. f_equal; eauto.
 Admitted.
-
+*)
 
 
 
@@ -735,19 +736,16 @@ move => [s'' [ts'' [? [? ?]]]].
 exists s'', ts''. split; first done.
 split.
 apply : partial_chain_contains; eauto.
-(*apply : contains_trans.*)
- admit. (*doable*)
-
-
-
-
+have [s [? ?]]:= typ_to_formula ty 0 ltac:(eassumption). subst.
+grab where subst_typ_1. rewrite <- instantiate_subst_typ_eq => //.
+move /formula_to_typ_injective. move /(_ ltac:(auto using bij_inj) ltac:(auto using Lc.instantiate_pred) ltac:(assumption)).
+move => <-. apply : contains_trans; first last; [constructor | done].
 grab List.Forall. apply : List.Forall_impl.
 clear => t [M [? [? ?]]].
 exists M. split; first done.
 split; last done. apply /leP. unfoldN. lia.
 }
-Admitted.
-
+Qed.
 
 (*NEXT: if there is a derivation, then there is a ipc2 long derivation*)
 Lemma f_to_normal_derivation : forall Gamma t M labeling, injective labeling -> 
