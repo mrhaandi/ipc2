@@ -77,6 +77,36 @@ Fixpoint term_size (t : term) : nat :=
   | uabs t1 => 1 + term_size t1
   end.
 
+Fixpoint typ_size (t : typ) : nat :=
+  match t with
+  | tyvar _ => 1
+  | tyfun t1 t2 => 1 + typ_size t1 + typ_size t2
+  | tyabs t1 => 1 + typ_size t1
+  end.
+
+
+
+Fixpoint formula_size (t : formula) : nat :=
+  match t with
+  | Formula.var _ => 1
+  | Formula.atom _ => 1
+  | Formula.arr t1 t2 => 1 + formula_size t1 + formula_size t2
+  | Formula.quant t1 => 1 + formula_size t1
+  end.
+
+
+(*start induction on measure, usage: elim /(@f_ind term term_size).*)
+Lemma f_ind (A : Type) (f : A -> nat) : forall  (P : A -> Prop) t, (forall (t1 : A), (forall (t2 : A), (f t2 < f t1)%coq_nat -> P t2) -> P t1) -> P t.
+Proof.
+move => P t H.
+move Hn : (f t) => n.
+move : n t Hn.
+elim /lt_wf_ind => n IH.
+move => t1 ?. subst.
+eauto.
+Qed.
+
+Arguments f_ind [A].
 
 (*start induction on term size, usage: elim /term_size_ind.*)
 Lemma term_size_ind : forall (P : term -> Prop) t, (forall (t1 : term), (forall (t2 : term), (term_size t2 < term_size t1)%coq_nat -> P t2) -> P t1) -> P t.
@@ -88,6 +118,32 @@ elim /lt_wf_ind => n IH.
 move => t1 ?. subst.
 eauto.
 Qed.
+
+
+Lemma nf_cases : forall M, (head_form M \/ (~(head_form M) /\ normal_form M) \/ ~(normal_form M)).
+Proof with auto using head_form, normal_form.
+elim.
+move => n. left. auto using head_form, normal_form.
+move => M. (case; last case) => ? N; try (grab and; case => ? ?); (case; last case) => ?; try (grab and; case => ? ?).
+1-2: idtac...
+1-7: right; right; inversion; grab head_form; inversion...
+
+move => ty M. (case; last case) => ?; try (grab and; case => ? ?).
+right; left; split; [inversion | apply nf_abs; by constructor ].
+right; left; split; [inversion | by apply nf_abs ].
+right; right; inversion; [grab head_form; inversion | done].
+
+move => M. (case; last case) => ?; try (grab and; case => ? ?); move => ty.
+idtac...
+1-2: right; right; inversion; grab head_form; inversion...
+
+move => M. (case; last case) => ?; try (grab and; case => ? ?).
+right; left; split; [inversion | apply nf_uabs; by constructor ].
+right; left; split; [inversion | by apply nf_uabs ].
+right; right; inversion; [grab head_form; inversion | done].
+Qed.
+
+
 
 (*if a term is reducible, construct some reductum*)
 Lemma reduce_reducible : forall t, is_reducible t -> exists t', reduction1 t t'.
@@ -747,9 +803,369 @@ split; last done. apply /leP. unfoldN. lia.
 }
 Qed.
 
-(*NEXT: if there is a derivation, then there is a ipc2 long derivation*)
-Lemma f_to_normal_derivation : forall Gamma t M labeling, injective labeling -> 
-  (Some (formula_to_typ labeling 0 t) == typing (map (fun t => Some (formula_to_typ labeling 0 t)) Gamma) M) ->
-  exists d, normal_derivation d Gamma t.
+Fixpoint is_head_form (M : term) : bool :=
+  match M with
+  | var _ => true
+  | app M _ | uapp M _ => is_head_form M
+  | _ => false
+  end.
+
+Fixpoint eta_weight (ty : typ) : nat :=
+  match ty with
+  | tyvar _ => 0
+  | tyfun tyl tyr => 1 + eta_weight tyr
+  | tyabs ty => 1 + eta_weight ty
+  end.
+
+(*w is maximal weight and h is true iff inside head for inspection*)
+Fixpoint is_eta_long (ctx : context typ) (M : term) (w : nat) (h : bool) : bool :=
+  match M with
+  | var x => if (typing ctx M) is Some ty then h || (typ_size ty <= w.+1) else false
+  | app M' N' => if (typing ctx M) is Some ty then (h || (typ_size ty <= w.+1)) && is_eta_long ctx M' w true && is_eta_long ctx N' w false else false
+  | uapp M' _ => if (typing ctx M) is Some ty then (h || (typ_size ty <= w.+1)) && is_eta_long ctx M' w true else false
+  | abs tyl M' => is_eta_long ((Some tyl)::ctx) M' w false
+  | uabs M' => is_eta_long (ctxmap (shift_typ 1 0) ctx) M' w false
+  end.
+
+Lemma eta_expand : forall (M : term) (ctx : context typ) ty (w : nat), Some ty == typing ctx M -> 
+  (normal_form M -> is_eta_long ctx M (w.+1) false ->
+  exists N, normal_form N /\ (Some ty == (typing ctx N)) /\ is_eta_long ctx N w false) /\
+  (head_form M -> is_eta_long ctx M (w.+1) true ->
+  exists N, head_form N /\ (Some ty == (typing ctx N)) /\ is_eta_long ctx N w true).
 Proof.
+elim /(f_ind term_size).
+(*better strategy: if M is in head form, then treat normal form branch uniformly by case on ty*)
+move => M.
+have := (nf_cases M); (case; last case).
+(*M is in head form*)
+admit. (*most work*)
+
+(*M is not in head form*)
+{
+case : M => /=.
+move => ? [? ?]. exfalso. grab where head_form. apply. auto using head_form.
+move => ? ? [? ?]. grab normal_form; by inversion.
+(*abs case*)
+{
+move => tyl M _ IH ctx ty w. move /typing_absP => [tyr -> HM].
+split; inversion. grab head_form. by inversion. move => ?.
+move : HM. move /IH. move /(_ ltac:(ssromega) w). case.
+move /(_ ltac:(assumption) ltac:(assumption)) => [N [? [? ?]]] _.
+exists (abs tyl N).
+split. by auto using normal_form.
+split. by rewrite typing_absE.
+done.
+}
+move => ? ? [? ?]. grab normal_form; by inversion.
+(*uabs case*)
+{
+move => M _ IH ctx ty w. move /typing_uabsP => [tyr -> HM].
+split; inversion. grab head_form. by inversion. move => ?.
+move : HM. move /IH. move /(_ ltac:(ssromega) w). case.
+move /(_ ltac:(assumption) ltac:(assumption)) => [N [? [? ?]]] _.
+exists (uabs N).
+split. by auto using normal_form.
+split. by rewrite typing_uabsE.
+done.
+}
+}
+(*M is not in normal form*)
+{
+intros.
+split; by [ | by move /nf_hf].
+}
+Admitted.
+
+case => /=.
+(*var case*)
+{
+move => x IH ctx ty w Hx.
+move : (Hx) => /eqP <-.
+split => _.
+(*var nf case*)
+{
+revert dependent ty. case => /=.
+move => n Hx _. exists (var x).
+split. by auto using normal_form, head_form.
+split. done. 
+rewrite /is_eta_long -/is_eta_long.
+move : (Hx) => /eqP <-. apply /orP => //=. right. apply /leP. unfoldN. lia.
+
+move => tyl tyr Hx ?. exists (abs tyl (app (var (x.+1)) (var 0))).
+split. by auto using normal_form, head_form.
+split. rewrite typing_absE. apply /typing_appP. exists tyl.
+admit. (*easy shift*)
+done.
+rewrite /is_eta_long -/is_eta_long.
+cbn.
+have : ctxnth ctx x = Some (tyl ->t tyr) by admit. (*easy*)
+move => ->.
+have : eqtyp tyl tyl by apply /eqP. move => ->.
+apply /andP. split. apply /andP. split.
+apply /eqP. unfoldN. lia.
+done.
+apply /eqP. unfoldN. lia.
+
+move => ty Hx ?. exists (uabs (uapp (var x) (tyvar 0))).
+split. admit.
+split. apply /typing_uabsP. eexists. reflexivity. apply /typing_uappP. exists (shift_typ 1 0 ty).
+rewrite subst_typ_to_subst_typ_1.
+admit. (*doable*)
+admit. (*somehow maybe with additional shift on x*)
+cbn.
+have : ctxnth (ctxmap (shift_typ 1 0) ctx) x = Some (shift_typ 1 0 (tyabs ty)) by admit.
+move => ->. cbn.
+have : typ_size (subst_typ 0 [:: tyvar 0] (shift_typ 1 1 ty)) = typ_size ty by admit.
+move => ->.
+apply /andP. split => //.
+}
+(*var hf case*)
+{
+move => _. exists (var x).
+split. by auto using head_form.
+split => //.
+cbn.
+admit. (*easy*)
+}
+}
+(*app case*)
+{
+move => M N IH ctx tyr.
+admit. (*inspect*)
+}
+(*abs case*)
+{
+move => tyl M IH ctx ty w. move /typing_absP => [tyr -> HM].
+split; inversion. grab head_form. by inversion. move => ?.
+move : HM. move /IH. move /(_ ltac:(ssromega) w). case.
+move /(_ ltac:(assumption) ltac:(assumption)) => [N [? [? ?]]] _.
+exists (abs tyl N).
+split. by auto using normal_form.
+split. by rewrite typing_absE.
+done.
+}
+(*uapp case*)
+{
+move => M tyl IH ctx tyr w HM. move : (HM) => /typing_uappP [ty] ?. subst. move => H'M. split.
+inversion. grab head_form. inversion.
+move : (HM) => /eqP <- /andP => [[? ?]]. 
+
+admit. (*inspect*)
+admit.
+}
+(*uabs case*)
+{
+move => M IH ctx ty w. move /typing_uabsP => [tyr -> HM].
+split; inversion. grab head_form. by inversion. move => ?.
+move : HM. move /IH. move /(_ ltac:(ssromega) w). case.
+move /(_ ltac:(assumption) ltac:(assumption)) => [N [? [? ?]]] _.
+exists (uabs N).
+split. by auto using normal_form.
+split. by rewrite typing_uabsE.
+done.
+}
+Qed.
+
+(*
+Fixpoint is_eta_long (ctx : context typ) (M : term) (w : nat) : bool :=
+  match M with
+  | var x => if (typing ctx M) is Some ty then eta_weight ty <= w else false
+  | app M' N' => if (typing ctx M) is Some ty then (eta_weight ty <= w) && is_eta_long ctx M' (w.+1) && is_eta_long ctx N' 0 else false
+  | uapp M' _ => if (typing ctx M) is Some ty then (eta_weight ty <= w) && is_eta_long ctx M' (w.+1) else false
+  | abs tyl M' => is_eta_long ((Some tyl)::ctx) M' 0
+  | uabs M' => is_eta_long (ctxmap (shift_typ 1 0) ctx) M' 0
+  end.
+
+?????
+Lemma eta_expand : forall (M : term) (ctx : context typ) ty (w : nat), 
+  normal_form M -> Some ty == typing ctx M -> is_eta_long ctx M (w.+1) ->
+  exists N, normal_form N /\ (Some ty == (typing ctx N)) /\ is_eta_long ctx N w.
+Proof.
+elim /(f_ind term_size).
+case => /=.
+(*var case*)
+move => x IH cty ty w ? Hx.
+move : (Hx) => /eqP <- ?.
+revert dependent ty. case => /=.
+admit. admit. admit. (*doable*)
+
+(*app case*)
+move => M N IH cty ty w. inversion. grab head_form. inversion.
+move => Hty. move : (Hty) => /eqP <-.
+move : Hty => /typing_appP => [[tyl ?] ?].
+case /andP. case /andP. move => ?.
+move /IH. move /(_ ltac:(unfoldN; lia) _ ltac:(auto using normal_form) ltac:(eassumption)).
+
+Qed.
+*)
+
+
+(*
+Fixpoint is_eta_long (ctx : context typ) (M : term) : bool :=
+  match M with
+  | var x => if (typing ctx M) is Some (tyvar _) then true else false
+  | app M' N' => if (typing ctx M) is Some (tyvar _) then is_eta_long_aux ctx M' && is_eta_long ctx N' else false
+  | uapp M' _ => if (typing ctx M) is Some (tyvar _) then is_eta_long_aux ctx M' else false
+  | abs tyl M' => is_eta_long ((Some tyl)::ctx) M'
+  | uabs M' => is_eta_long (ctxmap (shift_typ 1 0) ctx) M'
+  end
+with is_eta_long_aux (ctx : context typ) (M : term) : bool :=
+  match M with
+  | var _ => true
+  | app M' N' => is_eta_long_aux ctx M' && is_eta_long ctx N'
+  | uapp M' _ => is_eta_long_aux ctx M'
+  | abs tyl M' => is_eta_long ((Some tyl)::ctx) M'
+  | uabs M' => is_eta_long (ctxmap (shift_typ 1 0) ctx) M'
+  end.
+*)
+
+(*
+MAYBE THIS ETA DECREASE IDEA IS TOO HEAVY
+Fixpoint eta_deficiency (ctx : context typ) (M : term) :=
+  match M with
+  | var _ => 0
+  | app M N => eta_deficiency ctx M + eta_deficiency ctx N
+  | uapp M _ => eta_deficiency ctx M
+  | abs tyl M => (eta_deficiency (Some tyl :: ctx) M) + 
+    if is_head_form M then
+      if (typing (Some tyl :: ctx) M) is Some tyr then eta_weight tyr else 0
+    else 0
+  | uabs M => (eta_deficiency (ctxmap (shift_typ 1 0) ctx) M) + 
+    if is_head_form M then
+      if (typing (ctxmap (shift_typ 1 0) ctx) M) is Some ty then eta_weight ty else 0
+    else 0
+  end.
+
+
+
+
+
+
+
+
+Lemma eta_deficiency_decrease : forall (M : term) (ctx : context typ) (ty : typ), 
+  normal_form M -> (Some ty == (typing ctx M)) -> eta_deficiency ctx M > 0 -> 
+  exists N, normal_form N /\ (Some ty == (typing ctx N)) /\ eta_deficiency ctx N < eta_deficiency ctx M.
+Proof.
+elim /(f_ind term_size).
+move => M IH ctx ty. inversion.
+(*M is in head form*)
+admit.
+
+(*M is an abstraction*)
+{
+match goal with [M' : term |- _] => rename M' into M end.
+move /typing_absP => [tyr ?]. subst => /=.
+move => HM. move : (HM) => /eqP => <-.
+move H_hf_M : (is_head_form M) => h.
+case : h H_hf_M => ?.
+(*body of M is in head form*)
+{
+revert dependent tyr. case => /=.
+(*body of M is of atomic type*)
+move => n ?.
+simpl_natarith.
+move /IH => /=. move /(_ ltac:(unfoldN; lia) _ ltac:(auto using normal_form) ltac:(eassumption)).
+move => [N [? [HN ?]]]. exists (abs t N).
+split. by auto using normal_form.
+split. by rewrite typing_absE.
+rewrite /eta_deficiency -/eta_deficiency.
+move : (HN) => /eqP <- /=.
+case : (is_head_form N); apply /eqP; unfoldN; lia.
+(*body of M is of arrow type*)
+move => tyl tyr HM.
+rewrite <- (@subject_reduction_proof.typing_shift _ 0 _ [:: Some tyl]) in HM.
+have : ([:: Some tyl, Some t & ctx] \|- shift_term 1 0 M \: tyl ->t tyr) by assumption.
+move => {HM}HM.
+exists (abs t (abs tyl (app (shift_term 1 0 M) (var 0)))).
+split. do 2 apply nf_abs. admit. (*doable*)
+split. do 2 rewrite -> typing_absE. apply /typing_appP. exists tyl => //.
+
+
+rewrite /eta_deficiency -/eta_deficiency /is_head_form -/is_head_form.
+rewrite /typing /typing_rec -/typing_rec -/typing.
+move : (HM) => /eqP <- /=.
+have : (Some tyl == Some tyl) by apply /eqP. move => ->. admit. (*kind of doable*)
+
+
+
+
+
+
+
+
+
+
+(*OLD approach*)
+revert dependent M. case => //=.
+(*var case*)
+case : tyr => /=.
+(*case tyr is tyvar*)
+intros. unfoldN. by lia.
+(*case tyr is tyfun*)
+move => tyl tyr n IH ? ? _ ?.
+exists (abs t (abs tyl (app (var (n.+1)) (var 0)))).
+split. do 2 apply nf_abs. by auto using normal_form, head_form.
+split. do 2 rewrite -> typing_absE. apply /typing_appP. exists tyl => //.
+move => /=.
+grab where (Some t). move /eqP. cbn => <-.
+have : (eqtyp tyl tyl = true) by apply /eqP. move => ->.
+apply /eqP. unfoldN. by lia.
+(*case tyr is tyabs*)
+move => tyr n IH ? ? _ _.
+exists (abs t (uabs (uapp (var (n.+1)) (tyvar 0)))).
+
+
+
+move => n IH ? ? _.
+
+inversion M.
+
+move => ?.
+
+
+
+have : (0 < eta_deficiency (Some t :: ctx) M)%coq_nat \/ (0 < eta_weight tyr)%coq_nat.
+unfoldN. grab where is_head_form. case : (is_head_form M) => ?; lia.
+case.
+move /leP /IH => /=. move /(_ ltac:(ssromega) _ ltac:(assumption) ltac:(eassumption)).
+move => [N [? [? ?]]].
+exists (abs t N). split; first by auto using normal_form.
+split; first by rewrite typing_absE.
+rewrite /eta_deficiency -/eta_deficiency.
+
+ by unfoldN; lia.
+
+move Hh : (is_head_form M) => h.
+case : h Hh.
+*)
+
+Lemma f_eta_long : ???
+
+
+(*NEXT: if there is a derivation, then there is a ipc2 long derivation*)
+(*deed induction on term size*)
+Lemma f_to_normal_derivation : forall t Gamma M labeling, bijective labeling -> 
+  (Some (formula_to_typ labeling 0 t) == typing (map (fun t => Some (formula_to_typ labeling 0 t)) Gamma) M) ->
+  well_formed_formula t -> Forall well_formed_formula Gamma -> normal_form M -> exists d, normal_derivation d Gamma t.
+Proof.
+elim /(@f_ind _ formula_size).
+case.
+
+admit. (*easy*)
+
+move => a _ Gamma M labeling ? ? ? ?.
+inversion.
+grab head_form. move /f_hf_to_partial_chain. 
+move /(_ _ _ _ _ _ _ ltac:(eassumption)). move /(_ ltac:(assumption) ltac:(assumption) ltac:(constructor)) => [s [ts [? [? ?]]]].
+(*more work is needed because induction is suddenly on term size*)
+admit.
+grab where abs. move /typing_absP => [? ?]. done.
+grab where uabs. move /typing_uabsP => [? ?]. done.
+
+move => tyl tyr IH.
+
+
+
+
 
