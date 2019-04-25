@@ -940,7 +940,7 @@ firstorder done using map_forms.
 Qed.
 
 
-Lemma eta_abs : forall M ty ctx n h, eta_deficiency (ctxinsert [:: Some ty] ctx n) (shift_term 1 n M) h = eta_deficiency ctx M h.
+Lemma eta_shift_term : forall M ty ctx n h, eta_deficiency (ctxinsert [:: Some ty] ctx n) (shift_term 1 n M) h = eta_deficiency ctx M h.
 Proof.
 elim /(f_ind term_size).
 
@@ -975,10 +975,24 @@ move => M IH ty ctx n ?.
 (have : (uabs (shift_term 1 n M)) = shift_term 1 n (uabs M) by reflexivity) => ->.
 rewrite subject_reduction_proof.typing_shift.
 have : ctxmap (shift_typ 1 0) (ctxinsert [:: Some ty] ctx n) = ctxinsert [:: Some (shift_typ 1 0 ty)] (ctxmap (shift_typ 1 0) ctx) n.
-admit. (*doable*)
+clear.
+move : (shift_typ 1 0) => f.
+elim : ctx n.
+elim => //=.
+move => n IH. cbn. f_equal. move : IH. cbn.
+have : (n - 0)%Nrec = n by unfoldN; lia. move => ->.
+move => <-.
+f_equal.
+
+move => /= a ctx IH.
+elim => //= n IHn.
+have : ctxinsert [:: Some (f ty)] (omap f a :: ctxmap f ctx) n.+1 = omap f a :: (ctxinsert [:: Some (f ty)] (ctxmap f ctx) n) by reflexivity. 
+move => ->.
+f_equal. by rewrite <- IH.
+
 move => ->.
 by move : (IH M ltac:(ssromega)) => ->.
-Admitted.
+Qed.
 
 
 Lemma shift_typ_size : forall ty n, typ_size (shift_typ 1 n ty) = typ_size ty.
@@ -1087,7 +1101,7 @@ move => /=.
 exists_matching_typing.
 exists_matching_typing. move : HL. rewrite typing_absE => ?. eassumption.
 exists_matching_typing. move : Hty. rewrite <- (@shift_typing _ tyl') => ?. eassumption.
-rewrite <- ctx_prepend. rewrite ? eta_abs.
+rewrite <- ctx_prepend. rewrite ? eta_shift_term.
 apply /leP.
 have ? := typ_size_pos tyl'. have ? := typ_size_pos ty.
 unfoldN. lia.
