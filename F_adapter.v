@@ -16,7 +16,7 @@ Unset Printing Implicit Defensive.
 Require Import Wf_nat.
 Require Import Psatz.
 
-Ltac unfoldN := try arith_hypo_ssrnat2coqnat; do ?unfold addn, subn, muln, addn_rec, subn_rec, muln_rec, leq, Equality.sort, nat_eqType in *.
+Ltac unfoldN := do ? arith_hypo_ssrnat2coqnat; do ?unfold addn, subn, muln, addn_rec, subn_rec, muln_rec, leq, Equality.sort, nat_eqType in *.
 
 Ltac inspect_eqn := try (
   match goal with
@@ -827,7 +827,361 @@ Fixpoint is_eta_long (ctx : context typ) (M : term) (w : nat) (h : bool) : bool 
   | uabs M' => is_eta_long (ctxmap (shift_typ 1 0) ctx) M' w false
   end.
 
-Lemma eta_expand : forall (M : term) (ctx : context typ) ty (w : nat), Some ty == typing ctx M -> 
+(*h is true when outermost type matters for head form*)
+Fixpoint eta_deficiency (ctx : context typ) (M : term) (h : bool) : nat :=
+  if (typing ctx M) is Some ty then
+    match M with
+    | var x => if h then (typ_size ty) - 1 else 0
+    | app M N => eta_deficiency ctx M false + eta_deficiency ctx N true + if h then (typ_size ty) - 1 else 0
+    | uapp M _ => eta_deficiency ctx M false + if h then (typ_size ty) - 1 else 0
+    | abs tyl M => eta_deficiency (Some tyl :: ctx) M true
+    | uabs M => eta_deficiency (ctxmap (shift_typ 1 0) ctx) M true
+    end
+  else 0.
+
+
+Lemma shift_typing : forall ctx ty M, typing (Some ty :: ctx) (shift_term 1 0 M) = typing ctx M.
+Proof.
+intros.
+have := @subject_reduction_proof.typing_shift M 0 ctx [:: Some ty].
+cbn => <-. f_equal. clear. rewrite /insert. cbn.
+case: ctx; reflexivity.
+Qed.
+
+(*pulls out typing expressions out of match*)
+Ltac exists_matching_typing := 
+  match goal with [|- context[match typing ?ctx ?M with | Some _ => _ | None => _ end]] => 
+    let ty := fresh "ty" in evar (ty : typ); let ty' := eval red in ty in 
+      (have : Some ty' == typing ctx M); last (move => /eqP <-); try eassumption end.
+
+
+Lemma subt_typ_id : forall ty (n : nat), subst_typ_1 n (tyvar 0) (shift_typ 1 (n.+1) ty) = ty.
+Proof.
+elim => /=.
+move => x n.
+have : (n < x)%coq_nat \/ (n = x)%coq_nat \/ (n > x)%coq_nat by lia.
+(case; last case) => ?; do ? inspect_eqn2; f_equal; unfoldN; lia.
+move => tyl IHl tyr IHr n. by rewrite (IHl n) (IHr n).
+move => ty IH n. by rewrite (IH n.+1).
+Qed.
+
+
+Lemma shift_forms : forall M n, 
+  (head_form M -> head_form (shift_term 1 n M)) /\ (normal_form M -> normal_form (shift_term 1 n M)).
+Proof.
+elim => /=.
+move => x n. case : (n <= x); split; auto using normal_form, head_form.
+
+move => M IHM N IHN n.
+split.
+inversion. constructor; firstorder done.
+inversion. grab head_form. inversion. constructor; constructor; firstorder done.
+
+move => ty M IH n.
+split. inversion.
+inversion. grab head_form. inversion.
+apply nf_abs. firstorder done.
+
+intros.
+split. inversion. constructor; firstorder done.
+inversion. grab head_form. inversion. constructor; constructor; firstorder done.
+
+intros.
+split. inversion.
+inversion. grab head_form. inversion.
+apply : nf_uabs. firstorder done.
+Qed.
+
+Lemma shift_head_form : forall M n, head_form M -> head_form (shift_term 1 n M). 
+Proof. 
+firstorder done using shift_forms.
+Qed.
+
+Lemma shift_normal_form : forall M n, normal_form M -> normal_form (shift_term 1 n M). 
+Proof. 
+firstorder done using shift_forms.
+Qed.
+
+
+Lemma map_forms : forall M n, 
+  (head_form M -> head_form (typemap (shift_typ 1) n M)) /\ (normal_form M -> normal_form (typemap (shift_typ 1) n M)).
+Proof.
+elim => /=.
+move => x n. case : (n <= x); split; auto using normal_form, head_form.
+
+move => M IHM N IHN n.
+split.
+inversion. constructor; firstorder done.
+inversion. grab head_form. inversion. constructor; constructor; firstorder done.
+
+move => ty M IH n.
+split. inversion.
+inversion. grab head_form. inversion.
+apply nf_abs. firstorder done.
+
+intros.
+split. inversion. constructor; firstorder done.
+inversion. grab head_form. inversion. constructor; constructor; firstorder done.
+
+intros.
+split. inversion.
+inversion. grab head_form. inversion.
+apply : nf_uabs. firstorder done.
+Qed.
+
+Lemma map_head_form : forall M n, head_form M -> head_form (typemap (shift_typ 1) n M). 
+Proof. 
+firstorder done using map_forms.
+Qed.
+
+Lemma map_normal_form : forall M n, normal_form M -> normal_form (typemap (shift_typ 1) n M). 
+Proof. 
+firstorder done using map_forms.
+Qed.
+
+
+Lemma eta_abs : forall M ty ctx n h, eta_deficiency (ctxinsert [:: Some ty] ctx n) (shift_term 1 n M) h = eta_deficiency ctx M h.
+Proof.
+elim /(f_ind term_size).
+
+case => /=.
+
+move => x IH ? ? n ?.
+(have : var (if n <= x then x + 1 else x) = shift_term 1 n (var x) by reflexivity) => ->.
+rewrite subject_reduction_proof.typing_shift.
+done.
+
+move => M N IH ? ? n ?.
+(have : (shift_term 1 n M @ shift_term 1 n N) = shift_term 1 n (M @ N) by reflexivity) => ->.
+rewrite subject_reduction_proof.typing_shift.
+move : (IH M ltac:(ssromega)). move => ->.
+move : (IH N ltac:(ssromega)). move => ->.
+done.
+
+move => tyl M IH ty ctx n ?.
+(have : (abs tyl (shift_term 1 n.+1 M)) = shift_term 1 n (abs tyl M) by reflexivity) => ->.
+rewrite subject_reduction_proof.typing_shift.
+(have : (Some tyl :: ctxinsert [:: Some ty] ctx n) = ctxinsert [:: Some ty] (Some tyl :: ctx) n.+1 by reflexivity) => ->.
+move : (IH M ltac:(ssromega)). move => ->.
+done.
+
+move => M tyl IH ? ? n ?.
+(have : (shift_term 1 n M @' tyl) = shift_term 1 n (M @' tyl) by reflexivity) => ->.
+rewrite subject_reduction_proof.typing_shift.
+move : (IH M ltac:(ssromega)). move => ->.
+done.
+
+move => M IH ty ctx n ?.
+(have : (uabs (shift_term 1 n M)) = shift_term 1 n (uabs M) by reflexivity) => ->.
+rewrite subject_reduction_proof.typing_shift.
+have : ctxmap (shift_typ 1 0) (ctxinsert [:: Some ty] ctx n) = ctxinsert [:: Some (shift_typ 1 0 ty)] (ctxmap (shift_typ 1 0) ctx) n.
+admit. (*doable*)
+move => ->.
+by move : (IH M ltac:(ssromega)) => ->.
+Admitted.
+
+
+Lemma shift_typ_size : forall ty n, typ_size (shift_typ 1 n ty) = typ_size ty.
+Proof.
+elim => //=; intros; auto.
+Qed.
+
+
+Lemma eta_shift_typ :forall M ctx n h, 
+  eta_deficiency (ctxmap (shift_typ 1 n) ctx) (typemap (shift_typ 1) n M) h = eta_deficiency ctx M h.
+Proof.
+have typing_shifttyp : forall t M d c ctx, M = (typemap (shift_typ d) c t) -> typing (ctxmap (shift_typ d c) ctx) M = omap (shift_typ d c) (typing ctx t) by
+intros; subst; apply subject_reduction_proof.typing_shifttyp.
+
+elim => /=.
+
+move => x ctx n h.
+rewrite -> (typing_shifttyp (var x)); last done.
+case : (typing ctx x) => //=.
+intros. by rewrite shift_typ_size.
+
+move => M IHM N IHN ctx n h.
+rewrite -> (typing_shifttyp (M @ N)); last done.
+case : (typing ctx (M @ N)) => //= ?.
+rewrite IHM IHN. by rewrite shift_typ_size.
+
+move => ty M IH ctx n h.
+rewrite -> (typing_shifttyp (abs ty M)); last done.
+case : (typing ctx (abs ty M)) => //= ?.
+have : (Some (shift_typ 1 n ty) :: ctxmap (shift_typ 1 n) ctx) = ctxmap (shift_typ 1 n) (Some ty :: ctx) by reflexivity.
+move => ->. rewrite IH. done.
+
+move => M IH ty ctx n h.
+rewrite -> (typing_shifttyp (M @' ty)); last done.
+case : (typing ctx (M @' ty)) => //= ?.
+rewrite IH. by rewrite shift_typ_size.
+
+move => M IH ctx n h.
+rewrite -> (typing_shifttyp (uabs M)); last done.
+case : (typing ctx (uabs M)) => //= ?.
+rewrite <- (@IH (ctxmap (shift_typ 1 0) ctx) n.+1).
+f_equal.
+clear. elim : ctx => //=.
+case => [a |]; move => ctx ? /=; f_equal; auto.
+f_equal. rewrite -> shift_shift_distr_ty.
+f_equal. done.
+Qed.
+
+
+Lemma ctx_prepend : forall ctx (ty : typ), ctxinsert [:: Some ty] ctx 0 = (Some ty) :: ctx.
+Proof.
+move => ctx ty. rewrite /insert.
+have : (0 - size ctx) = 0 by unfoldN; lia. move => ->.
+by case : ctx.
+Qed.
+
+
+Lemma typ_size_pos : forall ty, 0 < typ_size ty.
+Proof.
+elim => /=; intros; apply /leP; unfoldN; lia.
+Qed.
+
+
+Lemma eta_expand : forall (M : term) (ctx : context typ) (ty : typ) (w : nat), Some ty == typing ctx M -> 
+  (normal_form M -> eta_deficiency ctx M true <= w.+1 ->
+  exists N, normal_form N /\ (Some ty == typing ctx N) /\ eta_deficiency ctx N true <= w) /\
+  (head_form M -> eta_deficiency ctx M false <= w.+1 ->
+  exists N, head_form N /\ (Some ty == typing ctx N) /\ eta_deficiency ctx N false <= w).
+Proof.
+elim /(f_ind term_size). case.
+
+(*var case*)
+{
+move => x IH ctx ty w Hty.
+split => _.
+admit. (*case analysis on ty*)
+move => _. exists (var x). 
+split. by auto using normal_form, head_form.
+split. done.
+rewrite /eta_deficiency. move : Hty => /eqP <-. apply /leP. lia.
+}
+
+(*app case*)
+{
+move => M N IH ctx ty w Hty => /=; move : (Hty) => /eqP <-.
+move : (Hty). move /typing_appP => [tyl] HM HN.
+split.
+(*nf app case*)
+{
+inversion. grab head_form. inversion. move.
+revert dependent ty. case.
+(*target is tyvar case*)
+admit.
+(*target is tyfun case*)
+{
+move => tyl' ty Hty HM.
+pose L := (abs tyl' (shift_term 1 0 (M @ N) @ 0)).
+have HL : Some (tyfun tyl' ty) == typing ctx L.
+apply /typing_absP. eexists. reflexivity. apply /typing_appP.
+eexists. rewrite shift_typing. eassumption. done.
+
+move => /= ?. exists L.
+split. apply nf_abs. apply nf_hf. apply hf_app; [apply : shift_head_form | ]; auto using head_form, normal_form.
+split. done.
+move => /=. 
+exists_matching_typing.
+exists_matching_typing. move : HL. rewrite typing_absE => ?. eassumption.
+exists_matching_typing. move : Hty. rewrite <- (@shift_typing _ tyl') => ?. eassumption.
+rewrite <- ctx_prepend. rewrite ? eta_abs.
+apply /leP.
+have ? := typ_size_pos tyl'. have ? := typ_size_pos ty.
+unfoldN. lia.
+}
+(*target is tyabs*)
+{
+move => ty Hty HM.
+pose L := (uabs ((typemap (shift_typ 1) 0 (M @ N)) @' 0)).
+have HL : Some (tyabs ty) == typing ctx L.
+apply /typing_uabsP. eexists. reflexivity. apply /typing_uappP.
+eexists; first last. rewrite subject_reduction_proof.typing_shifttyp.
+move : Hty => /eqP <-. apply /eqP. cbn. reflexivity.
+rewrite subst_typ_to_subst_typ_1. by rewrite subt_typ_id.
+move => /= ?.
+
+exists L.
+split. apply nf_uabs. apply nf_hf. apply hf_uapp.
+apply map_head_form. auto using head_form.
+
+split. done.
+move => /=.
+exists_matching_typing.
+exists_matching_typing. move : HL. rewrite typing_uabsE => ?. eassumption.
+exists_matching_typing. 
+have : typemap (shift_typ 1) 0 M @ typemap (shift_typ 1) 0 N = typemap (shift_typ 1) 0 (M @ N) by reflexivity. move => ->.
+rewrite subject_reduction_proof.typing_shifttyp. move : Hty => /eqP <-. cbn. apply /eqP. reflexivity.
+rewrite -> ? eta_shift_typ.
+have ? := typ_size_pos ty. apply /leP. unfoldN. lia.
+}
+}
+(*hf app case*)
+{
+inversion => ?.
+move : (HM) => /IH. move /(_ ltac:(cbn; unfoldN; lia) (eta_deficiency ctx M false - 1)).
+case => _. move /(_ ltac:(assumption) ltac:(apply /leP; unfoldN; lia)) => [M' [? [? ?]]].
+move : (HN) => /IH. move /(_ ltac:(cbn; unfoldN; lia) (eta_deficiency ctx N true - 1)).
+case. move /(_ ltac:(assumption) ltac:(apply /leP; unfoldN; lia)) => [N' [? [? ?]]].
+move => _. exists (app M' N').
+split. by auto using head_form.
+split. apply /typing_appP. by eauto.
+move => /=.
+exists_matching_typing. apply /typing_appP. eexists; eassumption.
+apply /leP. unfoldN. lia.
+}
+}
+(*abs case*)
+{
+move => tyl M IH ctx ty w. move /typing_absP => [tyr -> HM].
+split; inversion. grab head_form. by inversion. move => ?.
+move : (HM). move /IH. move /(_ ltac:(ssromega) w). case.
+move /(_ ltac:(assumption)).
+apply : unnest.
+grab where eta_deficiency. move => /=.
+exists_matching_typing. apply /typing_absP. eexists. reflexivity. eassumption. done.
+move => [N [? [? ?]]] _.
+exists (abs tyl N).
+split. by auto using normal_form.
+split. apply /typing_absP. eexists. reflexivity. assumption.
+move => /=.
+exists_matching_typing. apply /typing_absP. eexists. reflexivity. eassumption.
+}
+(*uapp case*)
+{
+admit.
+}
+(*uabs case*)
+{
+move => M IH ctx ty w. move /typing_uabsP => [tyr -> HM].
+split; inversion. grab head_form. by inversion. move => ?.
+move : (HM) => /IH. move /(_ ltac:(ssromega) w). case.
+move /(_ ltac:(assumption)).
+apply : unnest.
+grab where eta_deficiency. move => /=.
+exists_matching_typing. apply /typing_uabsP. eexists. reflexivity. eassumption. done.
+move => [N [? [? ?]]] _.
+exists (uabs N).
+split. by auto using normal_form.
+split. by rewrite typing_uabsE.
+move => /=.
+exists_matching_typing. apply /typing_uabsP. eexists. reflexivity. eassumption.
+}
+Admitted.
+
+
+
+have : (eta_deficiency ctx M false = 0) \/ 
+  (eta_deficiency ctx M false = (eta_deficiency ctx M false - 1).+1) by unfoldN; lia.
+case => ->.
+have : (eta_deficiency ctx N true = 0) \/ 
+  (eta_deficiency ctx N true = (eta_deficiency ctx N true - 1).+1) by unfoldN; lia.
+case => ->.
+
+(*
+Lemma eta_expand_OLDER : forall (M : term) (ctx : context typ) ty (w : nat), Some ty == typing ctx M -> 
   (normal_form M -> is_eta_long ctx M (w.+1) false ->
   exists N, normal_form N /\ (Some ty == (typing ctx N)) /\ is_eta_long ctx N w false) /\
   (head_form M -> is_eta_long ctx M (w.+1) true ->
@@ -965,7 +1319,7 @@ split. by rewrite typing_uabsE.
 done.
 }
 Qed.
-
+*)
 (*
 Fixpoint is_eta_long (ctx : context typ) (M : term) (w : nat) : bool :=
   match M with

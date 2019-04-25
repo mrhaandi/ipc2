@@ -82,6 +82,11 @@ Ltac nip := match goal with
   end.
 
 
+Lemma unnest : forall (A B C : Prop), A -> (B -> C) -> (A -> B) -> C.
+Proof.
+auto.
+Qed.
+
 Ltac do_first_tac n t :=
   match n with
   | 0%nat => idtac
