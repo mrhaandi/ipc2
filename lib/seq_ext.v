@@ -158,6 +158,7 @@ Hint Resolve ctxindex_map ctxleqxx ctxleq_trans ctxleq_app
              ctxleq_appl ctxleq_appr ctxleq_map.
 
 (* Forall *)
+Module seq_ext_Forall.
 
 Fixpoint Forall A (P : A -> Prop) xs :=
   if xs is x :: xs then P x /\ Forall P xs else True.
@@ -188,6 +189,8 @@ apply (iffP idP); elim: xs => //= x xs IH.
 - by case/andP => -> /IH.
 - by case => ->.
 Qed.
+
+End seq_ext_Forall.
 
 (* zip *)
 

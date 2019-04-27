@@ -51,6 +51,22 @@ move /in_cons_iff.
 case => [-> | ?]; move /Forall_cons_iff => [? ?]; auto.
 Qed.
 
+
+Lemma Forall_In_iff : forall (A : list T), Forall P A <-> forall (a : T), In a A -> P a.
+Proof.
+move => A. constructor; elim : A => [ | b A IH] //=.
+
+move /Forall_cons_iff => [? /IH]. firstorder by subst.
+move => ?. apply Forall_cons_iff. firstorder by subst.
+Qed.
+
+
+Lemma Forall_and (Q : T -> Prop) : forall (A : list T), Forall P A -> Forall Q A -> Forall (fun a => P a /\ Q a) A.
+Proof.
+elim => // a A IH.
+inversion. inversion. constructor; firstorder done.
+Qed.
+
 End ForallFacts.
 
 

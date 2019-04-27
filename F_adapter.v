@@ -359,10 +359,10 @@ case => //=.
 move => s Gamma IH.
 case => //=.
 
-intros * => ?. case => ? ? ?. move /eqP. case.
+intros * => ?. case /Forall_cons_iff => ? ? ?. move /eqP. case.
 move /formula_to_typ_injective. auto.
 
-intros * => ?. case => ? ? ?.
+intros * => ?. case /Forall_cons_iff => ? ? ?.
 move /IH. auto.
 Qed.
 
@@ -650,7 +650,7 @@ grab iipc2. move /iipc2_wff => [? ?].
 do 2 f_equal.
 apply bind_shift_eq => //.
 
-grab List.Forall. grab List.Forall. grab injective. clear => ?.
+grab Forall. grab Forall. grab injective. clear => ?.
 elim : Gamma => //.
 
 move => t Gamma IH. inversion. inversion.
@@ -770,7 +770,7 @@ Lemma f_hf_to_partial_chain : forall labeling, bijective labeling -> forall M Ga
   let ctx := (map (fun t => Some (formula_to_typ labeling 0 t)) Gamma) in
   head_form M -> Some (formula_to_typ labeling 0 t) == typing ctx M -> eta_deficiency ctx M false = 0 ->
   exists s ts, In s Gamma /\ partial_chain s t ts /\ 
-    (List.Forall (fun t' => exists M', term_size M' < term_size M /\ normal_long_derivation ctx M' (formula_to_typ labeling 0 t')) ts).
+    (Forall (fun t' => exists M', term_size M' < term_size M /\ normal_long_derivation ctx M' (formula_to_typ labeling 0 t')) ts).
 Proof.
 move => labeling Hl.
 elim /term_size_ind.
@@ -796,7 +796,7 @@ move => [s' [ts' [? [? ?]]]] ?.
 exists s', (ts' ++ [::s]). split. done.
 split. by apply : partial_chain_arr.
 rewrite Forall_app_iff. split.
-grab List.Forall. apply : List.Forall_impl.
+grab Forall. apply : Forall_impl.
 clear => t [M [? [? ?]]].
 exists M. split. apply /leP. unfoldN. lia.
 by constructor.
@@ -825,74 +825,13 @@ have [s [? ?]]:= typ_to_formula ty 0 ltac:(eassumption). subst.
 grab where subst_typ_1. rewrite <- instantiate_subst_typ_eq => //.
 move /formula_to_typ_injective. move /(_ ltac:(auto using bij_inj) ltac:(auto using Lc.instantiate_pred) ltac:(assumption)).
 move => <-. apply : contains_trans; first last; [constructor | done].
-grab List.Forall. apply : List.Forall_impl.
+grab Forall. apply : Forall_impl.
 move => ? [M' [? ?]].
 exists M'. split. apply /leP. unfoldN. by lia.
 done.
 }
 Qed.
 
-
-(*TODO: add eta longness*)
-(*NEXT: if there is a derivation, then there is a ipc2 long derivation*)
-Lemma f_hf_to_partial_chain : forall labeling, bijective labeling -> forall M Gamma t, 
-  Forall well_formed_formula Gamma -> well_formed_formula t -> head_form M -> (Some (formula_to_typ labeling 0 t) == typing (map (fun t => Some (formula_to_typ labeling 0 t)) Gamma) M) ->
-  exists s ts, In s Gamma /\ partial_chain s t ts /\ 
-    (List.Forall (fun t' => exists M', normal_form M' /\ term_size M' < term_size M /\ (Some (formula_to_typ labeling 0 t') == typing (map (fun t => Some (formula_to_typ labeling 0 t)) Gamma) M')) ts).
-Proof.
-move => labeling Hl.
-elim /term_size_ind.
-move => M IH Gamma t ? ?. inversion.
-
-(*var case*)
-{
-rewrite typing_varE. move /index_to_in.
-move /(_ ltac:(auto using bij_inj) ltac:(assumption) ltac:(assumption)) => ?.
-eexists. exists [::]. split; first eassumption.
-split; do ? constructor.
-}
-
-(*app case*)
-{
-move /typing_appP => [tyl].
-have [s [-> ?]] := (@typ_to_formula tyl labeling 0 ltac:(assumption)).
-move /(@IH _ _ _ (Formula.arr s t)) => /=.
-move /(_ ltac:(unfoldN; lia) ltac:(assumption) ltac:(by constructor) ltac:(assumption)).
-move => [s' [ts' [? [? ?]]]] ?.
-exists s', (ts' ++ [::s]). split; first done.
-split. by apply : partial_chain_arr.
-rewrite Forall_app_iff. split.
-grab List.Forall. apply : List.Forall_impl.
-clear => t [M [? [? ?]]].
-exists M. split; first done.
-split; last done. apply /leP. unfoldN. lia.
-
-constructor; last done.
-eexists. split; first eassumption. 
-split; last done. apply /leP. unfoldN. lia.
-}
-
-(*uapp case*)
-{
-move /typing_uappP => [tyl]. rewrite subst_typ_to_subst_typ_1.
-have [s' [-> ?]] := (@typ_to_formula tyl labeling 1 ltac:(assumption)).
-move => ?.
-move /(@IH _ _ _ (Formula.quant s')) => /=.
-move /(_ ltac:(unfoldN; lia) ltac:(assumption) ltac:(by constructor) ltac:(assumption)).
-move => [s'' [ts'' [? [? ?]]]].
-exists s'', ts''. split; first done.
-split.
-apply : partial_chain_contains; eauto.
-have [s [? ?]]:= typ_to_formula ty 0 ltac:(eassumption). subst.
-grab where subst_typ_1. rewrite <- instantiate_subst_typ_eq => //.
-move /formula_to_typ_injective. move /(_ ltac:(auto using bij_inj) ltac:(auto using Lc.instantiate_pred) ltac:(assumption)).
-move => <-. apply : contains_trans; first last; [constructor | done].
-grab List.Forall. apply : List.Forall_impl.
-clear => t [M [? [? ?]]].
-exists M. split; first done.
-split; last done. apply /leP. unfoldN. lia.
-}
-Qed.
 
 Fixpoint is_head_form (M : term) : bool :=
   match M with
@@ -1275,31 +1214,154 @@ move /(eta_expand_rec_2 (eta_deficiency ctx M true)). move /(_ ltac:(assumption)
 eexists. split. eassumption. split. eassumption. unfoldN. lia.
 Qed.
 
+Lemma partial_chain_atom : forall a ts s, partial_chain s (atom a) ts <-> chain s a ts.
+Proof.
+move => a; elim.
+intros until 0.
+split; inversion; by constructor.
+
+move => t ts IH s.
+split.
+inversion. apply : chain_cons.
+eassumption. by rewrite <- IH.
+
+inversion. apply : partial_chain_cons.
+eassumption. by rewrite -> IH.
+Qed.
+
+
+Lemma head_form_atom_formula : forall M ctx t, head_form M -> normal_long_derivation ctx M t -> exists n, t = tyvar n.
+Proof.
+intros *. case.
+move => ?. case => ? /= _. exists_matching_typing. clear. case : t => /=. 
+by eauto.
+1-2: by intros *; rewrite typ_size_pos_2 => ?; unfoldN; lia.
+
+move => ? ? _ _. case => ? /= _. exists_matching_typing. clear. case : t => /=. 
+by eauto.
+1-2: by intros *; rewrite typ_size_pos_2 => ?; unfoldN; lia.
+
+move => ? ? _. case => ? /= _. exists_matching_typing. clear. case : t => /=.
+by eauto.
+1-2: by intros *; rewrite typ_size_pos_2 => ?; unfoldN; lia.
+Qed.
+
+
+Lemma formula_to_typ_atom : forall labeling t n, well_formed_formula t -> formula_to_typ labeling 0 t = tyvar n -> exists a, t = atom a.
+Proof.
+move => ?. case => //.
+intros *. inversion. lia.
+by eauto.
+Qed.
+
+Lemma relax_depth_normal_derivation : forall (n m : nat) (Γ : list formula) (s : formula), 
+  normal_derivation n Γ s -> (n <= m)%coq_nat -> normal_derivation m Γ s.
+Proof.
+elim /lt_wf_ind.
+move => n IH. intros.
+grab normal_derivation. inversion.
+
+all: have : m = S (Nat.pred m) by lia.
+all: move => ->.
+
+constructor.
+apply : IH; try eassumption; lia.
+
+constructor.
+move => a. grab where normal_derivation. move /(_ a) => ?.
+apply : IH; try eassumption; lia.
+
+apply : derive_atom; try eassumption.
+apply : Forall_impl; last eassumption.
+intros. apply : IH; try eassumption; lia.
+Qed.
+
+
+Lemma contains_wff : forall s t, contains s t -> well_formed_formula s -> well_formed_formula t.
+Proof.
+intros until 0. elim.
+auto.
+
+intros. grab well_formed_formula where quant. inversion.
+
+intros. grab where well_formed_formula. apply.
+grab lc. move /Lc.instantiate_pred. by apply. 
+Qed.
+
+Lemma partial_chain_wff : forall ts s t, well_formed_formula s -> partial_chain s t ts -> well_formed_formula t.
+Proof.
+elim.
+intros. grab partial_chain. inversion.
+apply : contains_wff; eassumption.
+
+move => u ts IH.
+intros. grab partial_chain. inversion.
+apply : IH; last eassumption.
+grab contains. move /contains_wff.
+nip; first auto. by inversion.
+Qed.
+
+Lemma partial_chain_param_wff : forall ts s t u, well_formed_formula s -> partial_chain s t ts -> In u ts -> well_formed_formula u.
+Proof.
+elim.
+intros. grab In. inversion.
+
+move => t' ts IH.
+intros. grab partial_chain. inversion.
+grab In. case.
+
+intro. subst.
+grab contains. move /contains_wff.
+nip; first auto. by inversion.
+
+grab partial_chain.
+move /IH. move => H' /H'. apply.
+grab contains. move /contains_wff.
+nip; first auto. by inversion.
+Qed.
+
+
+Lemma duplicate : forall (A : Prop), A <-> A /\ A.
+Proof.
+move => ?. constructor; by [ | case].
+Qed.
+
+
+
 
 (*NEXT: if there is a derivation, then there is a ipc2 long derivation*)
 (*deed induction on term size*)
 Lemma f_to_normal_derivation : forall M t Gamma labeling, bijective labeling -> 
-  let ctx := (map (fun t => Some (formula_to_typ labeling 0 t)) Gamma) in (Some (formula_to_typ labeling 0 t) == typing ctx M) ->
-  eta_deficiency ctx M true = 0 -> well_formed_formula t -> Forall well_formed_formula Gamma -> normal_form M -> exists d, normal_derivation d Gamma t.
+  let ctx := (map (fun t => Some (formula_to_typ labeling 0 t)) Gamma) in normal_long_derivation ctx M (formula_to_typ labeling 0 t) ->
+  well_formed_formula t -> Forall well_formed_formula Gamma -> exists d, normal_derivation d Gamma t.
 Proof.
 elim /(f_ind term_size).
-case.
+move => ? IH ? Gamma *.
+grab normal_long_derivation. case => *.
+grab normal_form. inversion.
 
-admit. (*easy ?*)
+(*head form case*)
+{
+grab head_form => Hhf. move : (Hhf) => /head_form_atom_formula. 
+move /(_ _ _ ltac:(constructor; try by [eassumption | constructor])) => [? ?].
 
-move => M N IH t Gamma labeling ? ctx Hty /=.
-exists_matching_typing. move => ? ?.
-(*due to eta longness t can only be an atom*)
-have : exists a, t = atom a.
-grab where typ_size. grab well_formed_formula. clear. case : t => /=.
-intro. inversion. lia.
-intros. eauto.
-intros *. rewrite typ_size_pos_2. intros. unfoldN. lia.
-intros *. rewrite typ_size_pos_2. intros. unfoldN. lia.
+move : (Hhf) => /f_hf_to_partial_chain. 
+move /(_ _ ltac:(eassumption) _ _ ltac:(eassumption) ltac:(eassumption) ltac:(eassumption)).
+apply : unnest. admit. (*easy*)
+grab where formula_to_typ. move /formula_to_typ_atom. move /(_ ltac:(assumption)) => [a ?]. subst.
+move => [s [ts] [? [/duplicate [/partial_chain_param_wff wff_ts /partial_chain_atom ?] ?]]].
 
-move => [a ?] ?. subst t.
-inversion. grab head_form. move /f_hf_to_partial_chain.
+(*each argument is derivable*)
+have : exists d, Forall (normal_derivation d Gamma) ts.
+apply : Forall_exists_monotone. intros. apply : relax_depth_normal_derivation; eassumption.
+grab In. move /Forall_In. move /(_ _ ltac:(eassumption)). move /wff_ts.
+move /Forall_In_iff. move /Forall_and. move /(_ _ ltac:(eassumption)).
+apply /Forall_impl.
+move => ? [? [? [?]]] /IH. apply; try eassumption.
+unfoldN. by lia.
 
+move => [d ?]. exists (d.+1). apply : derive_atom; try eassumption.
+}
 
 
 

@@ -1,5 +1,6 @@
 From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq.
 From LCAC Require Import Relations_ext seq_ext_base ssrnat_ext seq_ext.
+Import seq_ext_Forall.
 
 Set Implicit Arguments.
 Unset Strict Implicit.
