@@ -1461,18 +1461,69 @@ done.
 *)
 
 
-Lemma relabel : forall a b f, bijective f -> exists (f' : label -> nat), bijective f' /\ f' a = f b /\ f' b = f a.
+Lemma exists_bijective_labeling : exists (f : label -> nat), bijective f.
 Proof.
+Admitted.
+
+(*
+(*Lemma relabel : forall a b f, bijective f -> exists (f' : label -> nat), bijective f' /\ (forall c, f' c = if c == a then f b else (if c == b then f a else f c)).*)
+Lemma relabel : forall a b f, bijective f -> exists (f' : label -> nat), bijective f' /\ f' a = f b /\ f' b = f a /\ (forall c, c <> a -> c <> b -> f' c = f c).
+Proof.
+(*
 have Heqn : forall (x y : nat), (eqn x y) = (x == y) by intros; reflexivity.
 move => a b f [g fg gf].
 exists (fun c => if c == a then f b else (if c == b then f a else f c)).
 split.
 admit.
 admit.
+*)
 Admitted.
+*)
+
+Lemma shift_labeling : forall (a : label) f, bijective f -> exists (f' : label -> nat), bijective f' /\ f' a = 0 /\ (forall b, f b < f a -> f' b = (f b).+1).
+Proof.
+move => a f /duplicate [/bij_inj ?] [g cfg cgf].
+
+exists (fun (b : label) => if b == a then 0 else (if f b < f a then (f b).+1 else f b)).
+split. exists (fun (n : nat) => if n == 0 then a else (if (n.-1) < f a then g (n.-1) else g n)).
+
+move => b.
+have := orbN (b == a). case /orP.
+move /duplicate => [/eqP ? ->]. by subst.
+move /duplicate => [/eqP ? /negbTE ->].
+
+have := orbN (f b < f a). case /orP.
+move /duplicate => [/leP ? H]. rewrite H => /=. rewrite H. by eauto.
+move /duplicate => [/eqP ? /negbTE H]. rewrite H => /=.
+move : H => /leP ?. have ? : f b <> f a by auto.
+by do ? inspect_eqn2.
+
+move => n.
+have := orbN (n == 0). case /orP.
+move /duplicate => [/eqP ? ->] /=.
+have : a == a by apply /eqP. move => ->. by subst.
+move /duplicate => [/eqP ? /negbTE ->].
+
+have := orbN (n.-1 < f a). case /orP.
+move /duplicate => [/leP ? H]. rewrite H cgf H /=. 
+have -> : (g n.-1 == a) = false.
+apply /negP. move /eqP => ?. subst. move : H. rewrite cgf => ?. unfoldN. by lia.
+unfoldN. by lia.
+
+move /duplicate => [/eqP H' /negbTE H]. rewrite H.
+have -> : (g n == a) = false.
+apply /negP. move /eqP => ?. subst. move : H'. rewrite cgf => ?. unfoldN. by lia.
+rewrite cgf. by inspect_eqn2.
+
+split. by have -> : a == a by apply /eqP.
+move => b ?.
+have := orbN (b == a). case /orP.
+move /duplicate => [/eqP ? ->]. subst. unfoldN. by lia.
+move /negbTE => ->. by inspect_eqn2.
+Qed.
 
 
-
+(*
 Lemma shift_labeling : forall L a labeling n, bijective labeling -> exists (labeling' : label -> nat), labeling' a = n /\ Forall [fun b => (labeling b).+1 = labeling' b] L /\ bijective labeling'.
 Proof.
 elim => /=.
@@ -1486,7 +1537,108 @@ move => Hl. case : (Hl) => l_inv Hl1 Hl2.
 move : (Hl). move /IH. move /(_ a (labeling b).+1) => [labeling' [? [? ?]]].
 admit. (*doable*)
 Admitted.
+*)
 
+Lemma formula_variable_bound : forall labeling t, exists (k : nat), forall labeling' n, 
+  (forall (a : label), labeling a < k -> labeling a = labeling' a) -> formula_to_typ labeling n t = formula_to_typ labeling' n t.
+Proof.
+move => labeling. elim => /=.
+
+move => ?. exists 0. by intros.
+
+move => a. exists ((labeling a).+1). by move => ? ? /(_ a ltac:(done)) ->.
+
+move => ? [k1 IH1] ? [k2 IH2]. exists (k1 + k2).
+move => labeling' n H.
+f_equal.
+apply : IH1 => ? ?. apply : H. apply /leP. unfoldN. by lia.
+apply : IH2 => ? ?. apply : H. apply /leP. unfoldN. by lia.
+
+move => ? [k IH]. exists k. intros. f_equal. by apply IH.
+Qed.
+
+
+Lemma formula_variable_bound2 : forall (labeling : label -> nat), forall t, exists (k : nat), forall (a : label), k <= labeling a -> fresh_in a t.
+Proof.
+move => labeling. elim.
+
+move => ?. exists 0. intros. by constructor.
+
+move => b. exists ((labeling b).+1). move => a ?. constructor => ?. subst. unfoldN. by lia.
+
+move => ? [k1 IH1] ? [k2 IH2]. exists (k1 + k2).
+move => b ?. constructor.
+apply : IH1. apply /leP. unfoldN. by lia.
+apply : IH2. apply /leP. unfoldN. by lia.
+
+move => ? [k IH]. exists k. intros. constructor. by apply IH.
+Qed.
+
+
+(*
+doesnt actually work because f may clash with itself
+Lemma bijectify : forall (f : label -> nat) (k : nat), exists (f' : label -> nat), bijective f' /\ (forall a, f a < k -> f a = f' a).
+Proof.
+move => f. elim.
+have [f' ?] := exists_bijective_labeling. exists f'.
+split. done.
+move => *. unfoldN. by lia.
+
+move => k [f' [Hf' ff']].
+case : (Hf') => [g' f'g' g'f'].
+
+have := @relabel (g' k) (g' (f (g' k))) f' ltac:(assumption).
+
+move => [f'' [? [? [? ?]]]]. exists f''.
+split. done.
+move => a ?. move : (Hf'' a) => ->.
+rewrite -> ? g'f'.
+have : (f a < k)%coq_nat \/ (f a = k) by unfoldN; lia.
+case => ?.
+move : (ff' a ltac:(by apply /leP)) => ->.
+
+
+move => [f'' [? Hf'']]. exists f''.
+split. done.
+move => a ?. move : (Hf'' a) => ->.
+rewrite -> ? g'f'.
+have : (f a < k)%coq_nat \/ (f a = k) by unfoldN; lia.
+case => ?.
+move : (ff' a ltac:(by apply /leP)) => ->.
+Qed.
+*)
+
+Lemma formulas_variable_bound : forall labeling ts, exists (k : nat), forall labeling' n, 
+  (forall (a : label), labeling a <= k -> labeling a = labeling' a) -> Forall (fun t => formula_to_typ labeling n t = formula_to_typ labeling' n t) ts.
+Proof.
+Admitted.
+
+
+Lemma formulas_variable_bound2 : forall (labeling : label -> nat), forall ts, exists (k : nat), forall (a : label), k <= labeling a -> Forall (fresh_in a) ts.
+Proof.
+Admitted.
+
+
+Lemma key_lemma : forall labeling, bijective labeling -> forall t, exists (a : label) labeling', fresh_in a t /\ forall n, formula_to_typ labeling' n (instantiate (Formula.atom a) n t) = formula_to_typ labeling n.+1 t.
+Proof.
+move => labeling /duplicate [[g lg gl] ?].
+move => t.
+have := @formula_variable_bound2 labeling t. move => [k ?].
+exists (g k).
+have := @shift_labeling (g k) labeling ltac:(assumption). move => [labeling' [? [Hl'2 ?]]].
+exists labeling'.
+split.
+grab where fresh_in. apply. by rewrite gl.
+revert dependent t. elim => /=.
+
+move => x _ n.
+have : (n = x) \/ (x <> n)%coq_nat by lia. case => ?.
+subst. inspect_eqb => /=. rewrite Hl'2. f_equal. unfoldN. by lia.
+by inspect_eqb.
+
+move => b.
+TODO.....
+Admitted.
 
 (*NEXT: if there is a derivation, then there is a ipc2 long derivation*)
 (*deed induction on term size*)
@@ -1540,6 +1692,10 @@ grab where eta_deficiency => /=. exists_matching_typing => ?.
 grab where typing. move /typing_uabsP => [?] ?. 
 revert dependent t. case => //= t ?. case => ?. subst.
 grab well_formed_formula. inversion.
+
+
+
+
 
 (*or try relabel correctly bijectively ?*)
 (*try formula_to_typ labeling 1 t = set (label a+1) to 0 in shift by 1 (instantiate (atom a) 0 t)*)
