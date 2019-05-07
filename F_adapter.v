@@ -1482,13 +1482,65 @@ grab contains. move /contains_wff.
 nip; first auto. by inversion.
 Qed.
 
+Definition big_sum (n : nat) : nat := nat_rect (fun _ => nat) 0 (fun i m => m + i.+1) n.
 
+Lemma big_sum_zero : forall (n : nat), big_sum n = 0 -> n = 0.
+Proof.
+case => //=. move => n ?. unfoldN. by lia.
+Qed.
 
+Definition label_to_nat (a : label) : nat :=
+  match a with
+  | (x, y) => (big_sum (x+y)) + y
+  end.
 
+Definition next_label (a : label) : label :=
+  match a with
+  | (0, y) => (y.+1, 0)
+  | (x.+1,y) => (x, y.+1)
+  end.
+
+Definition nat_to_label (n : nat) : label :=
+  iter n next_label (0,0).
 
 Lemma exists_bijective_labeling : exists (f : label -> nat), bijective f.
 Proof.
-Admitted.
+exists label_to_nat, nat_to_label.
+{
+move => a.
+move Hn : (label_to_nat a) => n.
+elim : n a Hn.
+
+move => [x y] /= ?.
+have /big_sum_zero ? : big_sum (x + y) = 0 by unfoldN; lia.
+unfoldN; f_equal; by lia.
+
+move => n IH [x y] /=.
+case : y => [| y] /=.
+case : x => [| x] /=. done.
+rewrite -/(_ + _). nat_norm. case.
+have -> : big_sum x + x = label_to_nat (0,x) by reflexivity.
+by move /IH => ->.
+
+nat_norm.
+have -> : big_sum (x + y).+1 + y = label_to_nat (x.+1, y) by done.
+rewrite [label_to_nat] lock. case. unlock.
+by move /IH => ->.
+}
+{
+elim => //=.
+
+move => n. move : (nat_to_label n) => [x y].
+case : x => /=. 
+
+rewrite -/(_ + _). nat_norm.
+move => *. unfoldN. by lia.
+
+move => m.
+rewrite -/(_ + _). nat_norm => /=.
+move => *. unfoldN. by lia.
+}
+Qed.
 
 (*
 (*Lemma relabel : forall a b f, bijective f -> exists (f' : label -> nat), bijective f' /\ (forall c, f' c = if c == a then f b else (if c == b then f a else f c)).*)
