@@ -25,14 +25,8 @@ Qed.
 
 Ltac unfoldN := do ? arith_hypo_ssrnat2coqnat; do ?unfold addn, subn, muln, addn_rec, subn_rec, muln_rec, leq, Equality.sort, nat_eqType in *.
 
-Ltac inspect_eqn := try (
-  match goal with
-  | [ |- context [eqn ?x ?y]] => 
-    do [(have : x <> y by unfoldN; lia); move /eqP /negbTE; let H := fresh in move => H; cbn in H; move : H => -> |
-     (have : x = y by unfoldN; lia); move /eqP; let H := fresh in move => H; cbn in H; move : H => ->]
-  end).
-
-Ltac inspect_eqn2 :=
+(*tries to simplify nat comparisons*)
+Ltac inspect_eqn :=
   match goal with
   | [ |- context [?x == ?y]] => 
     do [(have : (x == y) = false by apply /eqP; unfoldN; lia); move => -> |
@@ -114,7 +108,7 @@ Qed.
 Arguments f_ind [A].
 
 
-(*h is true when outermost type matters for head form*)
+(*if h is true, then the outermost type matters for head form*)
 Fixpoint eta_deficiency (ctx : context typ) (M : term) (h : bool) : nat :=
   if (typing ctx M) is Some ty then
     match M with
@@ -130,19 +124,6 @@ Fixpoint eta_deficiency (ctx : context typ) (M : term) (h : bool) : nat :=
 (*signifies that D |> ctx |- M : ty and M is beta normal and eta long wrt D*)
 Inductive normal_long_derivation (ctx : context typ) (M : term) (ty : typ) : Prop :=
   | nld_intro : Some ty == typing ctx M -> normal_form M -> eta_deficiency ctx M true = 0 -> normal_long_derivation ctx M ty.
-
-
-
-(*start induction on term size, usage: elim /term_size_ind.*)
-Lemma term_size_ind : forall (P : term -> Prop) t, (forall (t1 : term), (forall (t2 : term), (term_size t2 < term_size t1)%coq_nat -> P t2) -> P t1) -> P t.
-Proof.
-move => P t H.
-move Hn : (term_size t) => n.
-move : n t Hn.
-elim /lt_wf_ind => n IH.
-move => t1 ?. subst.
-eauto.
-Qed.
 
 
 Lemma nf_cases : forall M, (head_form M \/ (~(head_form M) /\ normal_form M) \/ ~(normal_form M)).
@@ -169,11 +150,10 @@ right; right; inversion; [grab head_form; inversion | done].
 Qed.
 
 
-
 (*if a term is reducible, construct some reductum*)
 Lemma reduce_reducible : forall t, is_reducible t -> exists t', reduction1 t t'.
 Proof.
-elim /term_size_ind.
+elim /(f_ind term_size).
 
 case; cbn.
 
@@ -230,7 +210,7 @@ Qed.
 (*a typable term that is not reducible is in normal form*)
 Lemma not_reducible_to_nf : forall t (ty : typ) ctx, negb (is_reducible t) -> (Some ty == typing ctx t) -> normal_form t.
 Proof.
-elim /term_size_ind.
+elim /(f_ind term_size).
 case.
 
 (*var case*)
@@ -298,22 +278,6 @@ Fixpoint formula_to_typ (labeling : label -> nat) (n : nat) (t : formula) : typ 
   | quant t => tyabs (formula_to_typ labeling (n.+1) t)
   end.
 
-(*
-(*atoms point to larger indices*)
-Fixpoint typ_to_formula (n : nat) (t : typ) : formula :=
-  match t with
-  | tyvar x => if x > n then atom (0, x-n) else Formula.var x
-  | tyfun s t => arr (typ_to_formula n s) (typ_to_formula n t)
-  | tyabs t => quant (typ_to_formula (1+n) t)
-  end.
- *)
-(*Definition type_environment_to_basis (ctx : context typ) : list formula : (map (omap (typ_to_formula 0)) ctx).*)
-
-(*
-Lemma f_to_ipc : forall t (ty : typ) Gamma, 
- normal_form t -> (Some ty == typing (map (fun t => Some (formula_to_typ t)) Gamma) t) -> 
- exists n, normal_derivation n Gamma (typ_to_formula 0 ty).
-*)
 
 Lemma in_to_index : forall t Gamma, In t Gamma -> exists i, forall labeling n, ctxindex (map (fun t => Some (formula_to_typ labeling n t)) Gamma) i (formula_to_typ labeling n t).
 Proof.
@@ -373,36 +337,6 @@ intros * => ?. case /Forall_cons_iff => ? ? ?.
 move /IH. auto.
 Qed.
 
-(*
-Lemma instantiate_subst_eq : forall t s n, formula_to_typ n (instantiate t n s) = subst_typ n [:: formula_to_typ n t] (formula_to_typ n s).
-Proof.
-(*
-move => t.
-elim; cbn.
-
-{
-move => m n.
-have : n = m \/ lt n m \/ lt m n by lia. case; last case.
-
-move => ?. subst.
-
-have : (m - m)%Nrec = 0 by ssromega.
-move => ->.
-cbn.
-inspect_eqb.
-
-admit. admit. admit.
-}
-
-admit.
-
-all: intros; by f_equal.
-*)
-Admitted.
-*)
-
-Lemma exists_labeling : exists (labeling : label -> nat), injective labeling. Admitted.
-
 (*increases all free type variables by 1 except a which is set to zero*)
 Fixpoint shift_typ_0 (a : nat) c t :=
   match t with
@@ -411,11 +345,6 @@ Fixpoint shift_typ_0 (a : nat) c t :=
     | tyabs t => tyabs (shift_typ_0 a (c.+1) t)
   end.
 
-(*
-Lemma shift_typ_0_shift : forall a ty n m, m <= n -> shift_typ 1 m (shift_typ_0 a n ty) = shift_typ_0 a n.+1 (shift_typ 1 m ty).
-Proof.
-Admitted.
-*)
 
 Lemma shift_typ_0_shift : forall a m ty n d, d <= n ->
   shift_typ_0 a (m + n) (shift_typ m d ty) = shift_typ m d (shift_typ_0 a n ty).
@@ -423,11 +352,11 @@ Proof.
 move => a m. elim => /=.
 move => n' n d ?.
 have : (d <= n')%coq_nat \/ (d > n')%coq_nat by lia.
-case => ?; do ? inspect_eqn2 => //.
+case => ?; do ? inspect_eqn => //.
 have : (n + a = n')%coq_nat \/ (n + a <> n')%coq_nat by lia.
-case => ?; do ? inspect_eqn2; try (f_equal; unfoldN; lia).
+case => ?; do ? inspect_eqn; try (f_equal; unfoldN; lia).
 have : (n <= n')%coq_nat \/ (n > n')%coq_nat by lia.
-case => ?; do ? inspect_eqn2 => //.
+case => ?; do ? inspect_eqn => //.
 
 intros; f_equal; auto.
 
@@ -435,6 +364,7 @@ move => ? IH *. f_equal.
 have : forall n m, (n + m).+1 = (n + m.+1) by intros; unfoldN; lia. move => ->.
 auto.
 Qed.
+
 
 Fixpoint subst_typ_1 n s t := 
   match t with
@@ -444,14 +374,6 @@ Fixpoint subst_typ_1 n s t :=
   end.
 
 
-
-(*
-Lemma labeling_ext : forall t labeling1 labeling2, (forall a, labeling1 a = labeling2 a) -> formula_to_typ labeling1 t = formula_to_typ labeling2 t.
-Proof.
-elim; cbn; intros; f_equal; eauto.
-Qed.
-*)
-
 Lemma subst_typ_to_subst_typ_1 : forall s t n, subst_typ n [:: s] t = subst_typ_1 n s t.
 Proof.
 move => s. elim => /=.
@@ -459,15 +381,15 @@ move => n m.
 have : (m = n) \/ (lt m n) \/ (lt n m) by lia.
 (case; last case) => ?.
 
-subst. do ? inspect_eqn2.
+subst. do ? inspect_eqn.
 have : (n - n) = 0 by unfoldN; lia. by move => ->.
 
-do ? inspect_eqn2. move => /=.
+do ? inspect_eqn. move => /=.
 
 have : (n - m) = (n - m - 1).+1 by ssromega. move => -> /=.
 move : {2}(n - m - 1) => d. case : d; cbn; unfoldN; intros; f_equal; lia.
 
-by do ? inspect_eqn2.
+by do ? inspect_eqn.
 
 all: intros; f_equal; eauto.
 Qed.
@@ -480,21 +402,22 @@ move => a d tyr. elim => /=.
 
 move => n' m.
 have : (m = n') \/ (m < n')%coq_nat \/ (m > n')%coq_nat by lia.
-(case; last case) => ?; do ? inspect_eqn2.
+(case; last case) => ?; do ? inspect_eqn.
 subst. apply : shift_typ_0_shift. ssromega.
 
 have : ((d + m).+1 + a = n') \/ ((d + m).+1 + a <> n') by lia.
-case => ?; do ? inspect_eqn2.
-subst => /=. f_equal. do ? inspect_eqn2. unfoldN. lia.
+case => ?; do ? inspect_eqn.
+subst => /=. f_equal. do ? inspect_eqn. unfoldN. lia.
 have : (d + m < n')%coq_nat \/ (d + m >= n')%coq_nat by lia.
-case => ?; do ? inspect_eqn2.
-1-3: move => /=; do ? inspect_eqn2; f_equal; unfoldN; lia.
+case => ?; do ? inspect_eqn.
+1-3: move => /=; do ? inspect_eqn; f_equal; unfoldN; lia.
 
 
 intros. f_equal; auto.
 intros. f_equal.
 have : forall d m, (m + d).+1 = (m.+1 + d) by intros; unfoldN; lia. move => ->. auto.
 Qed.
+
 
 Lemma shift_typ_0_preserves_typing a n ctx t ty : 
   ctx \|- t \: ty ->
@@ -523,44 +446,44 @@ Qed.
 
 Lemma labeling_shift_typ_eq : forall labeling m t n, lc n t -> formula_to_typ labeling (n+m) t = shift_typ m n (formula_to_typ labeling n t).
 Proof.
-move => labeling m. elim; cbn; intros; grab lc; inversion; f_equal; auto.
+move => labeling m. elim => /=; intros; grab lc; inversion; f_equal; auto.
 
 by inspect_eqn.
-inspect_eqn. unfoldN. lia.
+
+inspect_eqn. unfoldN. by lia.
 grab lc. grab where formula_to_typ. move => IH /IH. auto.
 Qed.
+
 
 Lemma instantiate_subst_typ_eq : forall labeling s n t, lc 0 t -> lc (n.+1) s -> 
   formula_to_typ labeling n (instantiate t n s) = subst_typ_1 n (formula_to_typ labeling 0 t) (formula_to_typ labeling (n.+1) s).
 Proof.
 move => labeling s n t Ht.
-elim : s n.
+elim : s n => /=.
 
-move => m n. inversion. cbn.
-have : (m = n) \/ (m < n)%coq_nat by lia. case.
-move => ?. subst.
+move => m n. inversion.
+have : (m = n) \/ (m < n)%coq_nat by lia. case => ?.
+subst.
 inspect_eqb. inspect_eqn.
 by apply : (@labeling_shift_typ_eq _ _ _ 0).
 
-move => ?.
-inspect_eqb. inspect_eqn. cbn.
-revert dependent m. case; cbn => //.
-intros. by inspect_eqn.
+inspect_eqb. inspect_eqn. move => /=.
+by inspect_eqn.
 
-cbn. move => a n _.
+move => a n _.
 do ? inspect_eqn.
-unfoldN. f_equal. lia.
+unfoldN. f_equal. by lia.
 
-cbn. intros. grab lc. inversion. f_equal; eauto.
+intros. grab lc. inversion. f_equal; eauto.
 
-cbn. move => s IH n. inversion. f_equal. eauto.
+move => s IH n. inversion. f_equal. eauto.
 Qed.
 
 
 Lemma bind_shift_eq : forall a t labeling n, injective labeling -> lc n t ->
   formula_to_typ labeling (n.+1) (bind a n t) = shift_typ_0 (labeling a) n (formula_to_typ labeling n t).
 Proof.
-move => a. elim; cbn.
+move => a. elim => /=.
 move => m labeling n _. inversion.
 by do ? inspect_eqn.
 
@@ -583,20 +506,21 @@ Qed.
 Lemma shift_typ_0_fresh : forall a t labeling n, injective labeling -> fresh_in a t -> lc n t -> 
   shift_typ 1 n (formula_to_typ labeling n t) = shift_typ_0 (labeling a) n (formula_to_typ labeling n t).
 Proof.
-move => a. elim.
+move => a. elim => /=.
 move => m labeling n _ _. inversion.
-cbn. by do ? inspect_eqn.
+by do ? inspect_eqn.
 
 move => b labeling n ?. inversion. move => _.
-cbn. have ? : labeling a <> labeling b by auto. do ? inspect_eqn. f_equal. unfoldN. lia.
+have ? : labeling a <> labeling b by auto. do ? inspect_eqn. f_equal. unfoldN. by lia.
 
-cbn; intros; grab lc; inversion; grab fresh_in; inversion; f_equal; auto.
+intros; grab lc; inversion; grab fresh_in; inversion; f_equal; auto.
 
-cbn. move => t IH labeling n *.
+move => t IH labeling n *.
 grab lc; inversion; grab fresh_in; inversion.
 f_equal.
 apply : IH => //.
 Qed.
+
 
 (*if there is an iipc2 derivation, then there is a corresponding system F typing*)
 Theorem iipc2_to_f : forall Gamma t, iipc2 Gamma t -> forall labeling, injective labeling -> exists M, (Some (formula_to_typ labeling 0 t) == typing (map (fun t => Some (formula_to_typ labeling 0 t)) Gamma) M).
@@ -708,11 +632,13 @@ apply : partial_chain_cons; try eassumption.
 by apply IH.
 Qed.
 
+
 Lemma contains_transitivity : forall s t u, contains s t -> contains t u -> contains s u.
 Proof.
 intros *; elim => //.
 intros; apply : contains_trans; eauto.
 Qed.
+
 
 Lemma partial_chain_contains : forall s t t' ts, partial_chain s t ts -> contains t t' -> partial_chain s t' ts.
 Proof.
@@ -722,11 +648,12 @@ constructor. apply : contains_transitivity; eauto.
 apply : partial_chain_cons; eauto.
 Qed.
 
+
 Lemma shift_formula_to_typ labeling : forall t n m, lc m t -> shift_typ n m (formula_to_typ labeling m t) = formula_to_typ labeling (m+n) t.
 Proof.
 elim => /=.
-intros *. inversion. by inspect_eqn2.
-intros * => _. inspect_eqn2. f_equal. unfoldN. lia.
+intros *. inversion. by inspect_eqn.
+intros * => _. inspect_eqn. f_equal. unfoldN. lia.
 intros. grab lc. inversion. f_equal; auto.
 intros. grab lc. inversion. f_equal.
 have : (m + n).+1 = (m.+1 + n) by unfoldN; lia. move => ->. auto.
@@ -748,7 +675,7 @@ Lemma f_hf_to_partial_chain : forall labeling, bijective labeling -> forall M Ga
     (Forall (fun t' => exists M', term_size M' < term_size M /\ normal_long_derivation ctx M' (formula_to_typ labeling 0 t')) ts).
 Proof.
 move => labeling Hl.
-elim /term_size_ind.
+elim /(f_ind term_size).
 move => M IH Gamma t ? ? ctx. inversion.
 
 (*var case*)
@@ -816,8 +743,6 @@ Fixpoint is_head_form (M : term) : bool :=
   end.
 
 
-
-
 Lemma shift_typing : forall ctx ty M, typing (Some ty :: ctx) (shift_term 1 0 M) = typing ctx M.
 Proof.
 intros.
@@ -827,13 +752,12 @@ case: ctx; reflexivity.
 Qed.
 
 
-
 Lemma subt_typ_id : forall ty (n : nat), subst_typ_1 n (tyvar 0) (shift_typ 1 (n.+1) ty) = ty.
 Proof.
 elim => /=.
 move => x n.
 have : (n < x)%coq_nat \/ (n = x)%coq_nat \/ (n > x)%coq_nat by lia.
-(case; last case) => ?; do ? inspect_eqn2; f_equal; unfoldN; lia.
+(case; last case) => ?; do ? inspect_eqn; f_equal; unfoldN; lia.
 move => tyl IHl tyr IHr n. by rewrite (IHl n) (IHr n).
 move => ty IH n. by rewrite (IH n.+1).
 Qed.
@@ -865,10 +789,12 @@ inversion. grab head_form. inversion.
 apply : nf_uabs. firstorder done.
 Qed.
 
+
 Lemma shift_head_form : forall M n, head_form M -> head_form (shift_term 1 n M). 
 Proof. 
 firstorder done using shift_forms.
 Qed.
+
 
 Lemma shift_normal_form : forall M n, normal_form M -> normal_form (shift_term 1 n M). 
 Proof. 
@@ -902,10 +828,12 @@ inversion. grab head_form. inversion.
 apply : nf_uabs. firstorder done.
 Qed.
 
+
 Lemma map_head_form : forall M n, head_form M -> head_form (typemap (shift_typ 1) n M). 
 Proof. 
 firstorder done using map_forms.
 Qed.
+
 
 Lemma map_normal_form : forall M n, normal_form M -> normal_form (typemap (shift_typ 1) n M). 
 Proof. 
@@ -1028,13 +956,11 @@ Proof.
 elim => /=; intros; apply /leP; unfoldN; lia.
 Qed.
 
+
 Lemma typ_size_pos_2 : forall ty, typ_size ty = (typ_size ty - 1) + 1.
 Proof.
 elim => /=; intros; unfoldN; lia.
 Qed.
-
-
-
 
 
 Lemma eta_expand_rec : forall (M : term) (ctx : context typ) (ty : typ) (w : nat), Some ty == typing ctx M -> 
@@ -1351,7 +1277,7 @@ exists N'. split. done. split. done. apply /leP. unfoldN. lia.
 Qed.
 
 (*if there is a beta normal form derivation, then there is a beta normal eta long form derivation*)
-Lemma eta_expand : forall (M : term) (ctx : context typ) (ty : typ), Some ty == typing ctx M -> normal_form M ->
+Theorem eta_expand : forall (M : term) (ctx : context typ) (ty : typ), Some ty == typing ctx M -> normal_form M ->
   exists N, normal_form N /\ (Some ty == typing ctx N) /\ eta_deficiency ctx N true = 0.
 Proof.
 intros. grab where typing.
@@ -1503,6 +1429,7 @@ Definition next_label (a : label) : label :=
 Definition nat_to_label (n : nat) : label :=
   iter n next_label (0,0).
 
+
 Lemma exists_bijective_labeling : exists (f : label -> nat), bijective f.
 Proof.
 exists label_to_nat, nat_to_label.
@@ -1542,20 +1469,6 @@ move => *. unfoldN. by lia.
 }
 Qed.
 
-(*
-(*Lemma relabel : forall a b f, bijective f -> exists (f' : label -> nat), bijective f' /\ (forall c, f' c = if c == a then f b else (if c == b then f a else f c)).*)
-Lemma relabel : forall a b f, bijective f -> exists (f' : label -> nat), bijective f' /\ f' a = f b /\ f' b = f a /\ (forall c, c <> a -> c <> b -> f' c = f c).
-Proof.
-(*
-have Heqn : forall (x y : nat), (eqn x y) = (x == y) by intros; reflexivity.
-move => a b f [g fg gf].
-exists (fun c => if c == a then f b else (if c == b then f a else f c)).
-split.
-admit.
-admit.
-*)
-Admitted.
-*)
 
 Lemma shift_labeling : forall (a : label) f, bijective f -> exists (f' : label -> nat), bijective f' /\ f' a = 0 /\ (forall b, f b < f a -> f' b = (f b).+1).
 Proof.
@@ -1573,7 +1486,7 @@ have := orbN (f b < f a). case /orP.
 move /duplicate => [/leP ? H]. rewrite H => /=. rewrite H. by eauto.
 move /duplicate => [/eqP ? /negbTE H]. rewrite H => /=.
 move : H => /leP ?. have ? : f b <> f a by auto.
-by do ? inspect_eqn2.
+by do ? inspect_eqn.
 
 move => n.
 have := orbN (n == 0). case /orP.
@@ -1590,31 +1503,15 @@ unfoldN. by lia.
 move /duplicate => [/eqP H' /negbTE H]. rewrite H.
 have -> : (g n == a) = false.
 apply /negP. move /eqP => ?. subst. move : H'. rewrite cgf => ?. unfoldN. by lia.
-rewrite cgf. by inspect_eqn2.
+rewrite cgf. by inspect_eqn.
 
 split. by have -> : a == a by apply /eqP.
 move => b ?.
 have := orbN (b == a). case /orP.
 move /duplicate => [/eqP ? ->]. subst. unfoldN. by lia.
-move /negbTE => ->. by inspect_eqn2.
+move /negbTE => ->. by inspect_eqn.
 Qed.
 
-
-(*
-Lemma shift_labeling : forall L a labeling n, bijective labeling -> exists (labeling' : label -> nat), labeling' a = n /\ Forall [fun b => (labeling b).+1 = labeling' b] L /\ bijective labeling'.
-Proof.
-elim => /=.
-move => a labeling n. move => Hl. case : (Hl) => l_inv Hl1 Hl2.
-have [labeling' [? [? ?]]] := @relabel a (l_inv n) labeling ltac:(assumption).
-exists labeling'. firstorder auto.
-by have <- := Hl2 n.
-
-move => b L IH a labeling n.
-move => Hl. case : (Hl) => l_inv Hl1 Hl2.
-move : (Hl). move /IH. move /(_ a (labeling b).+1) => [labeling' [? [? ?]]].
-admit. (*doable*)
-Admitted.
-*)
 
 Lemma formula_variable_bound : forall labeling t, exists (k : nat), forall labeling' n, 
   (forall (a : label), labeling a < k -> labeling a = labeling' a) -> formula_to_typ labeling n t = formula_to_typ labeling' n t.
@@ -1650,45 +1547,6 @@ apply : IH2. apply /leP. unfoldN. by lia.
 
 move => ? [k IH]. exists k. intros. constructor. by apply IH.
 Qed.
-
-
-(*
-doesnt actually work because f may clash with itself
-Lemma bijectify : forall (f : label -> nat) (k : nat), exists (f' : label -> nat), bijective f' /\ (forall a, f a < k -> f a = f' a).
-Proof.
-move => f. elim.
-have [f' ?] := exists_bijective_labeling. exists f'.
-split. done.
-move => *. unfoldN. by lia.
-
-move => k [f' [Hf' ff']].
-case : (Hf') => [g' f'g' g'f'].
-
-have := @relabel (g' k) (g' (f (g' k))) f' ltac:(assumption).
-
-move => [f'' [? [? [? ?]]]]. exists f''.
-split. done.
-move => a ?. move : (Hf'' a) => ->.
-rewrite -> ? g'f'.
-have : (f a < k)%coq_nat \/ (f a = k) by unfoldN; lia.
-case => ?.
-move : (ff' a ltac:(by apply /leP)) => ->.
-
-
-move => [f'' [? Hf'']]. exists f''.
-split. done.
-move => a ?. move : (Hf'' a) => ->.
-rewrite -> ? g'f'.
-have : (f a < k)%coq_nat \/ (f a = k) by unfoldN; lia.
-case => ?.
-move : (ff' a ltac:(by apply /leP)) => ->.
-Qed.
-*)
-
-Lemma formulas_variable_bound : forall labeling ts, exists (k : nat), forall labeling' n, 
-  (forall (a : label), labeling a <= k -> labeling a = labeling' a) -> Forall (fun t => formula_to_typ labeling n t = formula_to_typ labeling' n t) ts.
-Proof.
-Admitted.
 
 
 Lemma formulas_variable_bound2 : forall (labeling : label -> nat), forall ts, exists (k : nat), forall (a : label), k <= labeling a -> Forall (fresh_in a) ts.
@@ -1731,30 +1589,6 @@ apply : IH => b. move /llf. by inversion.
 Qed.
 
 
-(*
-Lemma key_lemma : forall labeling, bijective labeling -> forall t, exists (a : label) labeling', fresh_in a t /\ forall n, formula_to_typ labeling' n (instantiate (Formula.atom a) n t) = formula_to_typ labeling n.+1 t.
-Proof.
-move => labeling /duplicate [[g lg gl] ?].
-move => t.
-have := @formula_variable_bound2 labeling t. move => [k ?].
-exists (g k).
-have := @shift_labeling (g k) labeling ltac:(assumption). move => [labeling' [? [Hl'2 ?]]].
-exists labeling'.
-split.
-grab where fresh_in. apply. by rewrite gl.
-revert dependent t. elim => /=.
-
-move => x _ n.
-have : (n = x) \/ (x <> n)%coq_nat by lia. case => ?.
-subst. inspect_eqb => /=. rewrite Hl'2. f_equal. unfoldN. by lia.
-by inspect_eqb.
-
-move => b.
-TODO.....
-Admitted.
-*)
-
-
 (*the usual presentation of intro_quant*)
 Lemma normal_intro_quant_fresh : forall (s: formula) (Γ : list formula) (a : label) (n : nat), 
   Forall (fresh_in a) Γ -> fresh_in a s ->
@@ -1769,7 +1603,7 @@ apply. done.
 Qed.
 
 
-(*NEXT: if there is a derivation, then there is a iipc2 eta-long beta-normal derivation*)
+(*if there is a derivation, then there is a iipc2 eta-long beta-normal derivation*)
 Theorem f_to_normal_derivation : forall M labeling t Gamma, bijective labeling ->
   let ctx := (map (fun t => Some (formula_to_typ labeling 0 t)) Gamma) in normal_long_derivation ctx M (formula_to_typ labeling 0 t) ->
   well_formed_formula t -> Forall well_formed_formula Gamma -> exists d, normal_derivation d Gamma t.
@@ -1855,20 +1689,6 @@ exists (d.+1). by apply : nd.
 }
 Qed.
 
-
-(*
-(*doesn't hold*)
-Lemma derivation_wff : forall (Gamma: list formula) (t: formula), derivation Gamma t -> Forall well_formed_formula Gamma -> well_formed_formula t.
-Proof.
-move => Gamma t. elim; clear.
-
-move => *. apply : Forall_In; eassumption.
-
-move => ? ? ? ? IH ? ?. move /IH. by inversion.
-
-(*arrow introduction breaks down because of additional source type*)
-Admitted.
-*)
 
 Lemma swap (P Q R : Prop) : (P -> Q -> R) -> (Q -> P -> R).
 Proof. by auto. Qed.
