@@ -7,8 +7,13 @@ F.v
 UserTactics.v
 MiscFacts.v
 ListFacts.v
+Diophantine.v
 Formula.v
 FormulaFacts.v
 Derivations.v
+Encoding.v
 IIPC2.v
 F_adapter.v
+Soundness.v
+Completeness.v
+MainResult.v
