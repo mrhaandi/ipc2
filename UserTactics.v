@@ -56,7 +56,7 @@ Tactic Notation "grab" constr(p) "where" constr(q) :=
   end.
 
 Tactic Notation "inversion" := let H := fresh "top" in 
-  do ? (match goal with [E : ?t = ?u |- _] => is_var u; change (unkeyed (t = u)) in E end); (*hide equalities*)
+  do ? (match goal with [E : ?t = ?u |- _] => do [is_var t | is_var u]; change (unkeyed (t = u)) in E end); (*hide equalities*)
   intro H; inversion H; clear H; (*invert top*)
   subst; (*do ? (match goal with [E : ?t = ?u |- _] => is_var u; tryif is_var t then subst t else subst u end); (*propagate substitutions*)*)
   do ? (match goal with [E : unkeyed ?e |- _] => change e in E end). (*restore equalities*)

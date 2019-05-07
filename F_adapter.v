@@ -737,7 +737,7 @@ Qed.
 Ltac exists_matching_typing := 
   match goal with [|- context[match typing ?ctx ?M with | Some _ => _ | None => _ end]] => 
     let ty := fresh "ty" in evar (ty : typ); let ty' := eval red in ty in 
-      (have : Some ty' == typing ctx M); last (move => /eqP <-); try eassumption end.
+      (have : Some ty' == typing ctx M); last ((move => /eqP <-); subst ty); try eassumption end.
 
 
 Lemma f_hf_to_partial_chain : forall labeling, bijective labeling -> forall M Gamma t, 
@@ -1034,6 +1034,9 @@ elim => /=; intros; unfoldN; lia.
 Qed.
 
 
+
+
+
 Lemma eta_expand_rec : forall (M : term) (ctx : context typ) (ty : typ) (w : nat), Some ty == typing ctx M -> 
   (normal_form M -> eta_deficiency ctx M true <= w.+1 ->
   exists N, normal_form N /\ (Some ty == typing ctx N) /\ eta_deficiency ctx N true <= w) /\
@@ -1220,7 +1223,97 @@ exists_matching_typing. apply /typing_absP. eexists. reflexivity. eassumption.
 }
 (*uapp case*)
 {
-admit.
+move => M tyl IH ctx ty w /duplicate [?] /typing_uappP [ty'] ? ? /=. 
+exists_matching_typing. split; inversion.
+(*nf case*)
+grab head_form. inversion.
+have : (eta_deficiency ctx M false = 0) \/ (eta_deficiency ctx M false = ((eta_deficiency ctx M false).-1).+1) by lia.
+case => ?.
+
+(*inspect ty*)
+{
+revert dependent ty. case.
+(*target is tyvar case*)
+{
+move => n ? HM _ /=.
+exists (M @' tyl) => /=.
+split. by do 2 constructor.
+have ? : Some (tyvar n) == typing ctx (M @' tyl).
+apply /typing_uappP. eexists; eassumption.
+split. done.
+exists_matching_typing => /=.
+apply /leP. unfoldN. by lia.
+}
+(*target is tyfun case*)
+{
+move => tyl' ty Hty HM.
+pose L := (abs tyl' (shift_term 1 0 (M @' tyl) @ 0)).
+have HL : Some (tyfun tyl' ty) == typing ctx L.
+apply /typing_absP. eexists. reflexivity. apply /typing_appP.
+eexists. rewrite shift_typing. eassumption. done.
+
+move => /= ?. exists L.
+split. apply nf_abs. apply nf_hf. apply hf_app; [apply : shift_head_form | ]; auto using head_form, normal_form.
+split. done.
+move => /=. 
+exists_matching_typing.
+exists_matching_typing. move : HL. rewrite typing_absE => ?. eassumption.
+exists_matching_typing. move : Hty. rewrite <- (@shift_typing _ tyl') => ?. eassumption.
+rewrite <- ctx_prepend. rewrite ? eta_shift_term.
+apply /leP.
+have ? := typ_size_pos tyl'. have ? := typ_size_pos ty.
+unfoldN. lia.
+}
+(*target is tyabs case*)
+{
+move => ty Hty HM.
+pose L := (uabs ((typemap (shift_typ 1) 0 (M @' tyl)) @' 0)).
+have HL : Some (tyabs ty) == typing ctx L.
+apply /typing_uabsP. eexists. reflexivity. apply /typing_uappP.
+eexists; first last. rewrite subject_reduction_proof.typing_shifttyp.
+move : Hty => /eqP <-. apply /eqP. cbn. reflexivity.
+rewrite subst_typ_to_subst_typ_1. by rewrite subt_typ_id.
+move => /= ?.
+
+exists L.
+split. apply nf_uabs. apply nf_hf. apply hf_uapp.
+apply map_head_form. auto using head_form.
+
+split. done.
+move => /=.
+exists_matching_typing.
+exists_matching_typing. move : HL. rewrite typing_uabsE => ?. eassumption.
+exists_matching_typing. 
+have -> : typemap (shift_typ 1) 0 M @' (shift_typ 1 0 tyl) = typemap (shift_typ 1) 0 (M @' tyl) by reflexivity.
+rewrite subject_reduction_proof.typing_shifttyp. move : Hty => /eqP <-. cbn. apply /eqP. reflexivity.
+rewrite -> ? eta_shift_typ.
+have ? := typ_size_pos ty. apply /leP. unfoldN. by lia.
+}
+}
+
+grab where typing. move /IH => /=. move /(_ ltac:(ssromega) ((eta_deficiency ctx M false).-1)).
+case => _. move /(_ ltac:(assumption) ltac:(apply /leP; lia)) => [N [? [? ?]]] ?.
+have ? : Some ty == typing ctx (N @' tyl) by apply /typing_uappP; eexists; eassumption.
+exists (N @' tyl) => /=.
+split. constructor. by constructor.
+split. done.
+exists_matching_typing. apply /leP. unfoldN. by lia.
+
+(*hf case*)
+have : (eta_deficiency ctx M false = 0) \/ (eta_deficiency ctx M false = ((eta_deficiency ctx M false).-1).+1) by lia.
+case => ?.
+move => _. exists (M @' tyl) => /=.
+split. by constructor.
+split. done.
+exists_matching_typing. apply /leP. unfoldN. by lia.
+
+nat_norm. grab where typing. move /IH => /=. move /(_ ltac:(ssromega) ((eta_deficiency ctx M false).-1)).
+case => _. move /(_ ltac:(assumption) ltac:(apply /leP; lia)) => [N [? [? ?]]] ?.
+have ? : Some ty == typing ctx (N @' tyl) by apply /typing_uappP; eexists; eassumption.
+exists (N @' tyl) => /=.
+split. by constructor.
+split. done.
+exists_matching_typing. apply /leP. unfoldN. by lia.
 }
 (*uabs case*)
 {
@@ -1238,7 +1331,7 @@ split. by rewrite typing_uabsE.
 move => /=.
 exists_matching_typing. apply /typing_uabsP. eexists. reflexivity. eassumption.
 }
-Admitted.
+Qed.
 
 
 Lemma eta_expand_rec_2 : forall (w : nat) (M : term) (ctx : context typ) (ty : typ), Some ty == typing ctx M -> normal_form M ->
