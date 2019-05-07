@@ -40,10 +40,14 @@ apply : H => //.
 Qed.
 
 
+
+
 Lemma eliminate_I : forall (ds : list diophantine) (s : formula), In s (ΓI ds) -> derivation [triangle] s.
 Proof.
 intros.
 filter_context_derivation.
+rewrite /s_x_s.
+
 admit. admit. admit.
 
 unfold s_x_d.

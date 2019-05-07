@@ -1748,3 +1748,41 @@ Qed.
 Print Assumptions iipc2_to_normal_derivation.
 
 
+Fixpoint last_atom (t : formula) : option label :=
+  match t with
+  | Formula.var _ => None
+  | atom a => Some a
+  | arr _ t => last_atom t
+  | quant t => last_atom t
+  end.
+
+Lemma instantiate_formula_size : forall a t n, formula_size (instantiate (atom a) n t) = formula_size t.
+Proof.
+move => a. elim => //=.
+move => m n. by case : (n =? m).
+move => ? IH1 ? IH2 n. by rewrite IH1 IH2.
+move => ? IH n. by rewrite IH.
+Qed.
+
+
+Lemma last_atom_instantiate : forall (a : label) s t n, last_atom t == Some a -> last_atom (instantiate s n t) == Some a.
+Proof.
+move => a s. elim; cbn; auto.
+Qed.
+
+
+Lemma derive_last_atom : forall (a : label) (t : formula), last_atom t == Some a -> well_formed_formula t -> derivation [:: atom a] t.
+Proof.
+move => a. elim /(f_ind formula_size). case => /=.
+move => ? ? /eqP. done.
+move => b _ /eqP. case => -> _. apply : ax; constructor => //. by constructor.
+move => s t IH /IH H. inversion. grab (lc 0 t). move /H => {H}H.
+apply : intro_arr. apply : weakening_cons. apply : H. unfoldN. by lia.
+
+move => t IH *.
+apply : intro_quant => b. apply : IH.
+rewrite instantiate_formula_size. unfoldN. by lia.
+by apply : last_atom_instantiate.
+grab well_formed_formula. inversion. apply : Lc.instantiate_pred => //. by constructor.
+Qed.
+
