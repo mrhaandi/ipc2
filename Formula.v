@@ -134,6 +134,9 @@ Inductive lc : nat -> formula -> Prop :=
     | lc_quant : forall (n: nat) (t: formula), lc (S n) t -> lc n (quant t).
 
 
+(*s is well formed, if it contains no unbound De Bruijn indices*)
+Definition well_formed_formula (s : formula) : Prop := lc 0 s.
+
 (*repeated instantiation by locally closed formulae*)
 Inductive contains : formula -> formula -> Prop :=
   | contains_rfl : forall (s: formula), contains s s

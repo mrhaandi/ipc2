@@ -12,9 +12,6 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
 
-(*s is well formed, if it contains no unbound De Bruijn indices*)
-Definition well_formed_formula (s : formula) : Prop := lc 0 s.
-
 (*second-order implicational intuitionistic propositional calculus IIPC2*)
 Inductive iipc2 (Gamma: list formula) : formula -> Prop :=
   | iipc2_ax : forall (t: formula), Forall well_formed_formula Gamma -> In t Gamma -> iipc2 Gamma t

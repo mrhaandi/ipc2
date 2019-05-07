@@ -64,6 +64,27 @@ grab shape (lc _ (quant _)); inversion.
 constructor. auto.
 Qed.
 
+Lemma succ_instantiate : forall s t n, lc n (instantiate t n s) -> lc 0 t -> lc (1 + n) s.
+Proof.
+elim => /=.
+(*case var*)
+move => n t m; intros.
+have : (m = n) \/ (m <> n) by lia.
+case => ?.
+subst. by constructor.
+grab (lc m). inspect_eqb. inversion. constructor. by lia.
+(*case atom*)
+intros; constructor.
+(*case arr*)
+intros. simpl.
+grab shape (lc _ (arr _ _)). inversion.
+constructor; eauto.
+(*case quant*)
+intros. simpl.
+grab shape (lc _ (quant _)); inversion.
+constructor. eauto.
+Qed.
+
 Lemma instantiate_prenex_eq : forall (t : formula) (n : nat) (f : nat -> option formula), 
   lc n t -> (forall (m : nat), m < n -> f m = None) -> instantiate_prenex f t = t.
 Proof.
@@ -440,4 +461,15 @@ intros.
 have ? := substitute_fresh_label.
 decompose_Forall.
 f_equal; auto.
+Qed.
+
+
+Lemma bind_instantiate : forall (a : label) (t : formula) (n : nat), fresh_in a t -> bind a n (instantiate (atom a) n t) = t.
+Proof.
+move => a. elim => /=.
+move => m n _. have : (n = m) \/ (n <> m) by lia. case => ?; inspect_eqb => //=.
+have := Label.eqb_eq a a. subst. by move /iffRL => ->.
+move => b ?. inversion. by rewrite Label.neq_neqb.
+move => *. grab fresh_in. inversion. f_equal; auto.
+move => *. grab fresh_in. inversion. f_equal; auto.
 Qed.

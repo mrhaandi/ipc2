@@ -1718,6 +1718,33 @@ grab where typing. move /nld_intro. move /(_ ltac:(assumption) ltac:(assumption)
 apply : f_to_normal_derivation; try eassumption.
 Qed.
 
+
+
+Lemma derivation_wff : forall (Gamma: list formula) (t: formula), derivation Gamma t -> Forall well_formed_formula Gamma /\ well_formed_formula t.
+Proof.
+move => ? ?. elim; intros *.
+move => /duplicate [?]. move /Forall_In => H {H}/H ?. by split.
+move => _ [?]. inversion => *. by split.
+move => _ [/Forall_cons_iff [? ?] ?]. split => //. by constructor.
+move => _ [? ?]. move /contains_wff. move /(_ ltac:(assumption)) => ?. by split.
+move => _ /(_ (0,0)) [?]. move /Lc.succ_instantiate. move /(_ ltac:(constructor)) => ?.
+split => //. by constructor.
+Qed.
+
+Theorem derivation_to_iipc2 : forall (Gamma: list formula) (t: formula), derivation Gamma t -> iipc2 Gamma t.
+Proof.
+move => ? ?. elim => /=.
+intros. by apply : iipc2_ax.
+intros. apply : iipc2_elim_arr; eassumption.
+intros. by apply : iipc2_intro_arr.
+intros *. move => _ H1 H2. elim : H2 H1 => //.
+clear. move => s t u *.
+grab iipc2. move /iipc2_elim_quant. by move /(_ _ ltac:(eassumption)).
+move => Gamma t _ IH. have [a /Forall_cons_iff [? ?]] := exists_fresh (t :: Gamma).
+move : IH. move /(_ a).
+intros. rewrite -(@bind_instantiate a _ 0 ltac:(eassumption)). by apply : iipc2_intro_quant.
+Qed.
+
 Print Assumptions iipc2_to_normal_derivation.
 
 
