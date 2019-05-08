@@ -15,8 +15,28 @@ Require Import ListFacts.
 Require Import UserTactics.
 Require Import MiscFacts.
 
+(*
 Inductive derivation (Γ: list formula) : formula → Prop :=
   | ax : ∀ (s: formula), Forall well_formed_formula Γ → In s Γ → derivation Γ s
+  | elim_arr : ∀ (s t : formula), derivation Γ (Formula.arr s t) → derivation Γ s → derivation Γ t
+  | intro_arr : ∀ (s t : formula), derivation (s :: Γ) t → derivation Γ (Formula.arr s t)
+  | elim_quant : ∀ (s t : formula), derivation Γ s → contains s t → derivation Γ t
+  | intro_quant : ∀ (s: formula), 
+   (forall (a: label), derivation Γ (instantiate (atom a) 0 s)) → derivation Γ (Formula.quant s).
+*)
+
+(*
+Inductive derivation (Γ: list formula) : formula → Prop :=
+  | ax : ∀ (s: formula), In s Γ → derivation Γ s
+  | elim_arr : ∀ (s t : formula), derivation Γ (Formula.arr s t) → derivation Γ s → derivation Γ t
+  | intro_arr : ∀ (s t : formula), well_formed_formula s → derivation (s :: Γ) t → derivation Γ (Formula.arr s t)
+  | elim_quant : ∀ (s t : formula), derivation Γ s → contains s t → derivation Γ t
+  | intro_quant : ∀ (s: formula), 
+   (forall (a: label), derivation Γ (instantiate (atom a) 0 s)) → derivation Γ (Formula.quant s).
+*)
+
+Inductive derivation (Γ: list formula) : formula → Prop :=
+  | ax : ∀ (s: formula), In s Γ → derivation Γ s
   | elim_arr : ∀ (s t : formula), derivation Γ (Formula.arr s t) → derivation Γ s → derivation Γ t
   | intro_arr : ∀ (s t : formula), derivation (s :: Γ) t → derivation Γ (Formula.arr s t)
   | elim_quant : ∀ (s t : formula), derivation Γ s → contains s t → derivation Γ t
@@ -30,7 +50,7 @@ Inductive normal_derivation : nat → list formula → formula → Prop :=
   | derive_quant : ∀ (n : nat) (Γ: list formula) (s: formula), 
    (forall (a: label), normal_derivation n Γ (instantiate (atom a) 0 s) ) → normal_derivation (S n) Γ (Formula.quant s)
   | derive_atom : ∀ (n : nat) (Γ: list formula) (a: label) (s: formula) (params: list formula), 
-      Forall well_formed_formula Γ → In s Γ → Formula.chain s a params → (Forall (normal_derivation n Γ) (params)) → normal_derivation (S n) Γ (Formula.atom a).
+      In s Γ → Formula.chain s a params → (Forall (normal_derivation n Γ) (params)) → normal_derivation (S n) Γ (Formula.atom a).
 
 Axiom normal_derivation_completeness : forall (Γ: list formula) (s: formula), derivation Γ s → exists (n : nat), normal_derivation n Γ s.
 
@@ -42,7 +62,6 @@ Ltac derivation_rule := first
       apply ax => //; by list_element)
   (*| match goal with | [H : In ?s ?Γ |- derivation _ ?s] => apply ax; list_inclusion end (*slow, unnecessary*)*)
   | (by (eauto using derivation))].
-
 
 Theorem normal_derivation_soundness : forall (n : nat) (Γ: list formula) (s: formula), normal_derivation n Γ s → derivation Γ s.
 Proof.
@@ -62,8 +81,9 @@ grab chain; elim.
 (*zero step chain*) derivation_rule.
 (*multistep chain*) move => ? ? t u *.
 decompose_Forall.
-admit. (* derivation_rule.*)
-Admitted.
+derivation_rule.
+Qed.
+
 
 (*inversion lemmas*)
 Lemma inv_arr : forall (Γ : list formula) (s t : formula),
@@ -217,7 +237,7 @@ intros; decompose_Forall.
 eauto.
 
 apply : derive_atom; try eassumption.
-Admitted.
+Qed.
 
 
 Lemma substitute_derivation_bindable : forall (s : formula) (Γ : list formula) (a b : label), 
@@ -260,10 +280,9 @@ list_inclusion.
 constructor. eauto.
 (*case atom*)
 apply: derive_atom; eauto.
-admit.
 apply : Forall_impl; last eassumption.
 eauto.
-Admitted.
+Qed.
 
 
 Lemma weakening : ∀ (Γ Δ: list formula) (t: formula), 
@@ -308,8 +327,8 @@ move => s H_In.
 apply in_app_or in H_In.
 case : H_In => H_In.
 apply : (weakening (Γ := Γ')); auto with *.
-admit. (*derivation_rule.*)
-Admitted.
+derivation_rule.
+Qed.
 
 
 (*looks for In/chain statements and eliminates impossible cases*)

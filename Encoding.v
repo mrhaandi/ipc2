@@ -51,13 +51,13 @@ Inductive interpretation (s : formula) (n : nat) : Prop :=
 
 Lemma interpretation_of_representation : forall (n: nat), interpretation (represent_nat n) n.
 Proof.
-(*split; apply intro_arr; derivation_rule.*)
-Admitted. 
+split; apply intro_arr; derivation_rule.
+Qed.
 
 Lemma interpretation_one : interpretation one 1.
 Proof.
-(*split; apply intro_arr; derivation_rule.*)
-Admitted.
+split; apply intro_arr; derivation_rule.
+Qed.
 
 Definition s_x_u : formula := let a := 1 in let b := 0 in
     quant (

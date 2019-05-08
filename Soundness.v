@@ -46,17 +46,13 @@ Lemma eliminate_I : forall (ds : list diophantine) (s : formula), In s (ΓI ds) 
 Proof.
 intros.
 filter_context_derivation.
-rewrite /s_x_s.
-
-admit. admit. admit.
-
 unfold s_x_d.
 apply : derive_quantified_arrow.
 move : (diophantine_variable_bound ds).
 elim ds.
 (*base case ds = []*)
 elim.
-admit. (*derivation_rule.*)
+derivation_rule.
 simpl; intros.
 apply : intro_quant.
 intros.
@@ -65,7 +61,7 @@ assumption.
 
 (*inductive case*)
 case; (intros; simpl; do ? (apply : derive_quantified_arrow); auto).
-Admitted.
+Qed.
 
 
 (*replace ΓS by a_s in assumption*)
@@ -135,8 +131,6 @@ do ? (grab chain; move /chain_arr => [? [? ?]]).
 grab chain; move /chain_atom => [? _].
 subst.
 decompose_Forall.
-admit.
-(*
 do 2 generalize_ΓU.
 decompose_derivation.
 do 2 filter_context_chain.
@@ -154,8 +148,6 @@ eapply (context_generalization (Δ := ((to_dagger (represent_nat m)) :: calC))) 
 2 : { intros; filter_context_derivation. }
 derivation_rule.
 Qed.
-*)
-Admitted.
 
 Lemma derivation_atom_eq : forall (a b : label), ~(In (Formula.atom a) (dagger :: calC)) -> ~(In (Formula.atom b) (dagger :: calC)) -> 
   derivation calC (Formula.arr (to_dagger (Formula.atom a)) (to_dagger (Formula.atom b))) -> a = b.
