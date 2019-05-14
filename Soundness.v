@@ -31,15 +31,13 @@ apply intro_quant.
 move => a.
 grab derivation.
 simpl.
-move /inv_quant/(_ a).
+move /elim_quant => /(_ (instantiate (atom a) 0 (quantify_formula n t))).
+apply : unnest. apply : contains_trans; first last; by constructor.
+
 rewrite ? instantiate_quantification.
-(have : (n + 0) = n by omega) => ->.
-move => HD.
-simpl.
-apply : H => //.
+(have -> : (n + 0) = n by omega) => /=.
+by auto.
 Qed.
-
-
 
 
 Lemma eliminate_I : forall (ds : list diophantine) (s : formula), In s (ΓI ds) -> derivation [triangle] s.
@@ -199,9 +197,11 @@ Lemma derivation_arr_trans : forall (Γ : list formula) (s t u : formula),
 Proof.
 intros * => Hst Htu.
 apply intro_arr.
-apply inv_arr in Hst.
+apply (weakening (Δ := (s :: Γ))) in Hst; last list_inclusion.
 apply (weakening (Δ := (s :: Γ))) in Htu; last list_inclusion.
-apply: elim_arr; eassumption.
+move : Htu => /elim_arr. apply.
+move : Hst => /elim_arr. apply.
+apply : ax. by constructor.
 Qed.
 
 
