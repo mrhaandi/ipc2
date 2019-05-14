@@ -1814,15 +1814,27 @@ Inductive derivation_depth : nat -> list formula -> formula -> Prop :=
 
 Lemma derivation_depth_relax : forall d d' Gamma t, derivation_depth d Gamma t -> d <= d' -> derivation_depth d' Gamma t.
 Proof.
-Admitted.
+elim.
+intros *. inversion => ?. by apply : dd_ax.
 
+move => d IH. intros *. inversion => ?.
+all: have -> : d' = (d'.-1).+1 by unfoldN; lia.
+all: have ? : d <= (d'.-1) by apply /leP; unfoldN; lia.
 
+by apply : dd_ax.
+apply : dd_elim_arr; by eauto.
+apply : dd_intro_arr; by auto.
+apply : dd_elim_quant; by auto.
+apply : dd_intro_quant; by auto.
+Qed.
+
+(*
 Lemma instantiate_instantiate : forall s u, well_formed_formula s -> well_formed_formula u -> 
  forall t m n, m <> n -> instantiate s m (instantiate u n t) = instantiate u n (instantiate s m t).
 Proof.
 Admitted.
 
-(*
+
 (*doesnt work, needs well_formed Gamma?*)
 Lemma instantiate_derivation_depth : forall u, well_formed_formula u -> forall d Gamma t n, derivation_depth d Gamma t -> derivation_depth d (map (instantiate u n) Gamma) (instantiate u n t).
 Proof.
@@ -2070,7 +2082,7 @@ move => *. constructor; by auto.
 move => *. constructor; by auto.
 Qed.
 
-Theorem derivation_to_iipc2_2 : forall (Gamma: list formula) (t: formula), derivation Gamma t -> Forall well_formed_formula Gamma -> well_formed_formula t -> iipc2 Gamma t.
+Theorem derivation_to_iipc2 : forall (Gamma: list formula) (t: formula), derivation Gamma t -> Forall well_formed_formula Gamma -> well_formed_formula t -> iipc2 Gamma t.
 Proof.
 move => Gamma t.
 move /derivation_exists_depth. case => d. elim : d Gamma t.
@@ -2102,3 +2114,12 @@ apply : IH => //.
 apply : Lc.instantiate_pred; by [| constructor].
 Qed.
 
+
+Theorem normal_derivation_completeness : forall (Gamma: list formula) (t: formula), 
+  Forall well_formed_formula Gamma -> well_formed_formula t -> derivation Gamma t -> exists (n : nat), normal_derivation n Gamma t.
+Proof.
+move => *. grab derivation. move /derivation_to_iipc2. move /(_ ltac:(done) ltac:(done)).
+by apply /iipc2_to_normal_derivation.
+Qed.
+
+Print Assumptions normal_derivation_completeness.
