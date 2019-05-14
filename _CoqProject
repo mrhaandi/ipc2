@@ -12,6 +12,7 @@ Formula.v
 FormulaFacts.v
 Derivations.v
 DerivationDepth.v
+DerivationsFacts.v
 Encoding.v
 IIPC2.v
 F_adapter.v

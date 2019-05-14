@@ -1741,11 +1741,3 @@ Qed.
 End derivation_to_iipc2.
 
 
-Theorem normal_derivation_completeness : forall (Gamma: list formula) (t: formula), 
-  Forall well_formed_formula Gamma -> well_formed_formula t -> derivation Gamma t -> exists (n : nat), normal_derivation n Gamma t.
-Proof.
-move => *. grab derivation. move /derivation_to_iipc2. move /(_ ltac:(done) ltac:(done)).
-by apply /iipc2_to_normal_derivation.
-Qed.
-
-Print Assumptions normal_derivation_completeness.
