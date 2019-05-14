@@ -10,31 +10,14 @@ Unset Printing Implicit Defensive.
 Set Maximal Implicit Insertion.
 
 Require Import FormulaFacts.
+Require Import DerivationDepth.
 Require Import ListFacts.
 
 Require Import UserTactics.
 Require Import MiscFacts.
+Require Import Psatz.
 
-(*
-Inductive derivation (Γ: list formula) : formula → Prop :=
-  | ax : ∀ (s: formula), Forall well_formed_formula Γ → In s Γ → derivation Γ s
-  | elim_arr : ∀ (s t : formula), derivation Γ (Formula.arr s t) → derivation Γ s → derivation Γ t
-  | intro_arr : ∀ (s t : formula), derivation (s :: Γ) t → derivation Γ (Formula.arr s t)
-  | elim_quant : ∀ (s t : formula), derivation Γ s → contains s t → derivation Γ t
-  | intro_quant : ∀ (s: formula), 
-   (forall (a: label), derivation Γ (instantiate (atom a) 0 s)) → derivation Γ (Formula.quant s).
-*)
-
-(*
-Inductive derivation (Γ: list formula) : formula → Prop :=
-  | ax : ∀ (s: formula), In s Γ → derivation Γ s
-  | elim_arr : ∀ (s t : formula), derivation Γ (Formula.arr s t) → derivation Γ s → derivation Γ t
-  | intro_arr : ∀ (s t : formula), well_formed_formula s → derivation (s :: Γ) t → derivation Γ (Formula.arr s t)
-  | elim_quant : ∀ (s t : formula), derivation Γ s → contains s t → derivation Γ t
-  | intro_quant : ∀ (s: formula), 
-   (forall (a: label), derivation Γ (instantiate (atom a) 0 s)) → derivation Γ (Formula.quant s).
-*)
-
+(*iipc2 derivations without regard for well-formedness*)
 Inductive derivation (Γ: list formula) : formula → Prop :=
   | ax : ∀ (s: formula), In s Γ → derivation Γ s
   | elim_arr : ∀ (s t : formula), derivation Γ (Formula.arr s t) → derivation Γ s → derivation Γ t
@@ -43,8 +26,9 @@ Inductive derivation (Γ: list formula) : formula → Prop :=
   | intro_quant : ∀ (s: formula), 
    (forall (a: label), derivation Γ (instantiate (atom a) 0 s)) → derivation Γ (Formula.quant s).
 
+
+(*beta-normal eta-long iipc2 derivations without regard for well-formedness*)
 Inductive normal_derivation : nat → list formula → formula → Prop :=
-(*(s :: Γ) in derive_arr not a problem, context permutation is admissible*)
   | derive_arr : ∀ (n : nat) (Γ: list formula) (s t: formula), 
     normal_derivation n (s :: Γ) t → normal_derivation (S n) Γ (Formula.arr s t)
   | derive_quant : ∀ (n : nat) (Γ: list formula) (s: formula), 
@@ -84,6 +68,49 @@ decompose_Forall.
 derivation_rule.
 Qed.
 
+Module DerivationIffDerivationDepth.
+
+From mathcomp Require Import ssreflect ssrbool ssrnat.
+
+Lemma derivation_exists_depth : forall (Gamma: list formula) (t: formula), derivation Gamma t -> exists (d: nat), derivation_depth d Gamma t.
+Proof.
+move => ? ?. elim => /=; clear.
+move => *. exists 0. by apply : dd_ax.
+intros *. move => _ [d1 ?] _ [d2 ?]. exists ((d1+d2).+1).
+apply : dd_elim_arr. 
+apply /derivation_depth_relax; try eassumption. apply /leP. unfoldN. by lia.
+apply /derivation_depth_relax; try eassumption. apply /leP. unfoldN. by lia.
+intros *. move => _ [d ?]. exists (d.+1). by apply : dd_intro_arr.
+intros *. move => _ [d Hd] H. elim : H d Hd.
+by eauto.
+clear. move => s t u *.
+grab derivation_depth. move /dd_elim_quant. move /(_ _ ltac:(eassumption)). by eauto.
+move => Gamma t _. have [a /Forall_cons_iff [? ?]] := exists_fresh (t :: Gamma).
+move /(_ a) => [d ?]. exists (d.+1). apply : dd_intro_quant. move => b.
+grab derivation_depth. move /(substitute_label_derivation_depth a b).
+congr derivation_depth.
+revert dependent Gamma.
+clear. elim => //=.
+move => s Gamma ? /Forall_cons_iff [? ?]. f_equal.
+by rewrite -substitute_fresh_label.
+by auto.
+by apply : rename_instantiation.
+Qed.
+
+Lemma derivation_hide_depth : forall (d: nat) (Gamma: list formula) (t: formula), derivation_depth d Gamma t -> derivation Gamma t.
+Proof.
+intros*. elim; clear.
+move => *. by apply : ax.
+move => *. apply : elim_arr; by eauto.
+move => *. by apply : intro_arr.
+move => *. apply : elim_quant; first eassumption.
+apply : contains_trans; [by eassumption | by constructor].
+move => *. by apply : intro_quant.
+Qed.
+
+End DerivationIffDerivationDepth.
+
+Import DerivationIffDerivationDepth.
 
 (*inversion lemmas*)
 Lemma inv_arr : forall (Γ : list formula) (s t : formula),
@@ -256,11 +283,14 @@ Theorem intro_quant_fresh : ∀ (s: formula) (Γ : list formula) (a : label),
   Forall (fresh_in a) Γ -> fresh_in a s ->
   (derivation Γ (instantiate (atom a) 0 s)) → derivation Γ (Formula.quant s).
 Proof.
-move => s Γ a H *.
-apply intro_quant => b.
-grab derivation.
-move /(substitute_derivation_bindable b H).
-rewrite -> rename_instantiation; auto.
+move => s Gamma a *.
+grab derivation. move /derivation_exists_depth => [d ?].
+apply : (@derivation_hide_depth (1+d)).
+apply : dd_intro_quant.
+move => b. grab derivation_depth. move /(@substitute_label_derivation_depth _ a b).
+rewrite rename_instantiation //.
+have -> : @seq.map = map by reflexivity.
+by rewrite -map_substitute_fresh_label //.
 Qed.
 
 

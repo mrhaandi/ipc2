@@ -10,6 +10,10 @@ Set Maximal Implicit Insertion.
 Require Import Arith.
 Require Import Psatz. (*lia : linear integer arithmetic, nia : non-linear integer arithmetic*)
 
+From LCAC Require Import ssrnat_ext.
+From mathcomp Require Import eqtype ssrnat.
+
+Ltac unfoldN := do ? arith_hypo_ssrnat2coqnat; do ?unfold addn, subn, muln, addn_rec, subn_rec, muln_rec, leq, Equality.sort, nat_eqType in *.
 
 Ltac decompose_or tactic :=
   match goal with
@@ -82,10 +86,22 @@ Ltac nip := match goal with
   end.
 
 
+(*transforms a goal (A -> B) -> C into goals A and B -> C*)
 Lemma unnest : forall (A B C : Prop), A -> (B -> C) -> (A -> B) -> C.
 Proof.
 auto.
 Qed.
+
+(*duplicates first argument*)
+Lemma duplicate : forall (A : Prop), A <-> A /\ A.
+Proof.
+move => ?. constructor; by [ | case].
+Qed.
+
+(*swaps first two arguments*)
+Lemma swap (P Q R : Prop) : (P -> Q -> R) -> (Q -> P -> R).
+Proof. by auto. Qed.
+
 
 Ltac do_first_tac n t :=
   match n with
@@ -104,3 +120,15 @@ Ltac do_last_tac n t :=
 (*applies n times tactic t recursively in the first/last generated goal*)
 Tactic Notation "do_first" constr(n) tactic(t) := do_first_tac n t.
 Tactic Notation "do_last" constr(n) tactic(t) := do_last_tac n t.
+
+
+(*tries to simplify nat comparisons*)
+Ltac inspect_eqn :=
+  match goal with
+  | [ |- context [?x == ?y]] => 
+    do [(have : (x == y) = false by apply /eqP; unfoldN; lia); move => -> |
+     (have : (x == y) = true by apply /eqP; unfoldN; lia); move => ->]
+  | [ |- context [?x <= ?y]] => 
+    do [(have : (x <= y) = false by apply /eqP; unfoldN; lia); move => -> |
+     (have : (x <= y) = true by apply /eqP; unfoldN; lia); move => ->]
+  end.

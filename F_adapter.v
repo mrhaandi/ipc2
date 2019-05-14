@@ -7,6 +7,7 @@ Require Import FormulaFacts.
 From LCAC Require Import Relations_ext seq_ext_base ssrnat_ext seq_ext F.
 Require Import UserTactics.
 Require Import Derivations.
+Require Import DerivationDepth.
 Require Import IIPC2.
 
 Set Implicit Arguments.
@@ -16,25 +17,6 @@ Unset Printing Implicit Defensive.
 Require Import Wf_nat.
 Require Import Psatz.
 
-
-Lemma duplicate : forall (A : Prop), A <-> A /\ A.
-Proof.
-move => ?. constructor; by [ | case].
-Qed.
-
-
-Ltac unfoldN := do ? arith_hypo_ssrnat2coqnat; do ?unfold addn, subn, muln, addn_rec, subn_rec, muln_rec, leq, Equality.sort, nat_eqType in *.
-
-(*tries to simplify nat comparisons*)
-Ltac inspect_eqn :=
-  match goal with
-  | [ |- context [?x == ?y]] => 
-    do [(have : (x == y) = false by apply /eqP; unfoldN; lia); move => -> |
-     (have : (x == y) = true by apply /eqP; unfoldN; lia); move => ->]
-  | [ |- context [?x <= ?y]] => 
-    do [(have : (x <= y) = false by apply /eqP; unfoldN; lia); move => -> |
-     (have : (x <= y) = true by apply /eqP; unfoldN; lia); move => ->]
-  end.
 
 Inductive normal_form : term -> Prop :=
   | nf_hf : forall M, head_form M -> normal_form M
@@ -1690,8 +1672,7 @@ exists (d.+1). by apply : nd.
 Qed.
 
 
-Lemma swap (P Q R : Prop) : (P -> Q -> R) -> (Q -> P -> R).
-Proof. by auto. Qed.
+
 
 
 Theorem subject_reduction ctx t t' ty :
@@ -1719,368 +1700,11 @@ apply : f_to_normal_derivation; try eassumption.
 Qed.
 
 
-(*
-Lemma derivation_wff : forall (Gamma: list formula) (t: formula), derivation Gamma t -> Forall well_formed_formula Gamma /\ well_formed_formula t.
-Proof.
-move => ? ?. elim; intros *.
-move => /duplicate [?]. move /Forall_In => H {H}/H ?. by split.
-move => _ [?]. inversion => *. by split.
-move => _ [/Forall_cons_iff [? ?] ?]. split => //. by constructor.
-move => _ [? ?]. move /contains_wff. move /(_ ltac:(assumption)) => ?. by split.
-move => _ /(_ (0,0)) [?]. move /Lc.succ_instantiate. move /(_ ltac:(constructor)) => ?.
-split => //. by constructor.
-Qed.
 
-Theorem derivation_to_iipc2 : forall (Gamma: list formula) (t: formula), derivation Gamma t -> iipc2 Gamma t.
-Proof.
-move => ? ?. elim => /=.
-intros. by apply : iipc2_ax.
-intros. apply : iipc2_elim_arr; eassumption.
-intros. by apply : iipc2_intro_arr.
-intros *. move => _ H1 H2. elim : H2 H1 => //.
-clear. move => s t u *.
-grab iipc2. move /iipc2_elim_quant. by move /(_ _ ltac:(eassumption)).
-move => Gamma t _ IH. have [a /Forall_cons_iff [? ?]] := exists_fresh (t :: Gamma).
-move : IH. move /(_ a).
-intros. rewrite -(@bind_instantiate a _ 0 ltac:(eassumption)). by apply : iipc2_intro_quant.
-Qed.
+Section derivation_to_iipc2.
 
-Print Assumptions iipc2_to_normal_derivation.
-
-
-Fixpoint last_atom (t : formula) : option label :=
-  match t with
-  | Formula.var _ => None
-  | atom a => Some a
-  | arr _ t => last_atom t
-  | quant t => last_atom t
-  end.
-
-Lemma instantiate_formula_size : forall a t n, formula_size (instantiate (atom a) n t) = formula_size t.
-Proof.
-move => a. elim => //=.
-move => m n. by case : (n =? m).
-move => ? IH1 ? IH2 n. by rewrite IH1 IH2.
-move => ? IH n. by rewrite IH.
-Qed.
-
-
-Lemma last_atom_instantiate : forall (a : label) s t n, last_atom t == Some a -> last_atom (instantiate s n t) == Some a.
-Proof.
-move => a s. elim; cbn; auto.
-Qed.
-
-
-Lemma derive_last_atom : forall (a : label) (t : formula), last_atom t == Some a -> well_formed_formula t -> derivation [:: atom a] t.
-Proof.
-move => a. elim /(f_ind formula_size). case => /=.
-move => ? ? /eqP. done.
-move => b _ /eqP. case => -> _. apply : ax; constructor => //. by constructor.
-move => s t IH /IH H. inversion. grab (lc 0 t). move /H => {H}H.
-apply : intro_arr. apply : weakening_cons. apply : H. unfoldN. by lia.
-
-move => t IH *.
-apply : intro_quant => b. apply : IH.
-rewrite instantiate_formula_size. unfoldN. by lia.
-by apply : last_atom_instantiate.
-grab well_formed_formula. inversion. apply : Lc.instantiate_pred => //. by constructor.
-Qed.
-*)
-
-(*
-uses abstraction well formedness in derivation
-Theorem derivation_to_iipc2_2 : forall (Gamma: list formula) (t: formula), derivation Gamma t -> Forall well_formed_formula Gamma -> iipc2 Gamma t.
-Proof.
-move => ? ?. elim => /=; clear.
-intros. by apply : iipc2_ax.
-intros. apply : iipc2_elim_arr; eauto.
-intros. apply : iipc2_intro_arr. have : Forall well_formed_formula (s :: Γ) by constructor. auto.
-intros *. move => _ H1 H2 /H1. elim : H2 => //.
-clear. move => s t u *.
-grab iipc2. move /iipc2_elim_quant. by move /(_ _ ltac:(eassumption)).
-move => Gamma t _ IH /IH. have [a /Forall_cons_iff [? ?]] := exists_fresh (t :: Gamma).
-move /(_ a).
-intros. rewrite -(@bind_instantiate a _ 0 ltac:(eassumption)). by apply : iipc2_intro_quant.
-Qed.
-*)
-
-Inductive derivation_depth : nat -> list formula -> formula -> Prop :=
-  | dd_ax : forall (d : nat) (Gamma: list formula) (s: formula), In s Gamma -> derivation_depth d Gamma s
-  | dd_elim_arr : forall (d: nat) (Gamma: list formula) (s t: formula), derivation_depth d Gamma (Formula.arr s t) -> derivation_depth d Gamma s -> derivation_depth (d.+1) Gamma t
-  | dd_intro_arr : forall (d: nat) (Gamma: list formula) (s t : formula), derivation_depth d (s :: Gamma) t -> derivation_depth (d.+1) Gamma (Formula.arr s t)
-  | dd_elim_quant : forall (d: nat) (Gamma: list formula) (s t : formula), derivation_depth d Gamma (Formula.quant s) -> well_formed_formula t -> derivation_depth (d.+1) Gamma (instantiate t 0 s)
-  | dd_intro_quant : forall (d: nat) (Gamma: list formula) (s: formula), 
-   (forall (a: label), derivation_depth d Gamma (instantiate (atom a) 0 s)) -> derivation_depth (d.+1) Gamma (Formula.quant s).
-
-Lemma derivation_depth_relax : forall d d' Gamma t, derivation_depth d Gamma t -> d <= d' -> derivation_depth d' Gamma t.
-Proof.
-elim.
-intros *. inversion => ?. by apply : dd_ax.
-
-move => d IH. intros *. inversion => ?.
-all: have -> : d' = (d'.-1).+1 by unfoldN; lia.
-all: have ? : d <= (d'.-1) by apply /leP; unfoldN; lia.
-
-by apply : dd_ax.
-apply : dd_elim_arr; by eauto.
-apply : dd_intro_arr; by auto.
-apply : dd_elim_quant; by auto.
-apply : dd_intro_quant; by auto.
-Qed.
-
-(*
-Lemma instantiate_instantiate : forall s u, well_formed_formula s -> well_formed_formula u -> 
- forall t m n, m <> n -> instantiate s m (instantiate u n t) = instantiate u n (instantiate s m t).
-Proof.
-Admitted.
-
-
-(*doesnt work, needs well_formed Gamma?*)
-Lemma instantiate_derivation_depth : forall u, well_formed_formula u -> forall d Gamma t n, derivation_depth d Gamma t -> derivation_depth d (map (instantiate u n) Gamma) (instantiate u n t).
-Proof.
-move => u ?. elim.
-intros *. inversion. apply : dd_ax. by apply /in_map.
-move => d IH ? ? n. inversion => /=.
-
-apply : dd_ax. by apply /in_map.
-
-apply : dd_elim_arr; eauto.
-have <- : forall n s t, instantiate u n (Formula.arr s t) = Formula.arr (instantiate u n s) (instantiate u n t) by intros; reflexivity.
-by auto.
-
-apply : dd_intro_arr. rewrite -map_cons. by auto.
-
-grab derivation_depth. move /IH. move /(_ (n.-1)) => /=. (*maybe n-1*)
-move /dd_elim_quant. move /(_ _ ltac:(eassumption)).
-admit. (*hmmmm*)
-
-apply : dd_intro_quant => a. rewrite instantiate_instantiate => //; last by constructor.
-(*definitely doesn't work this way*)
-Admitted.
-*)
-
-Lemma substitute_label_derivation_depth : forall d (a b: label) Gamma t, derivation_depth d Gamma t -> derivation_depth d (map (substitute_label a b) Gamma) (substitute_label a b t).
-Proof.
-elim.
-intros *. inversion. apply : dd_ax. by apply /in_map.
-move => d IH a b Gamma ?. inversion => /=.
-
-apply : dd_ax. by apply /in_map.
-
-apply : dd_elim_arr; eauto.
-have <- : forall s t, substitute_label a b (Formula.arr s t) = Formula.arr (substitute_label a b s) (substitute_label a b t) by intros; reflexivity.
-by auto.
-
-apply : dd_intro_arr. rewrite -map_cons. by auto.
-
-rewrite -substitute_instantiation. apply : dd_elim_quant.
-have -> : forall s, (quant (substitute_label a b s)) = substitute_label a b (quant s) by reflexivity.
-by eauto. by apply : lc_substitute.
-
-apply : dd_intro_quant => c.
-
-case : (Label.eq_dec c a) => ?.
-subst.
-have [c' ?] := exists_fresh ([:: Formula.atom a; Formula.atom b; s] ++ (map (substitute_label a b) Gamma)).
-do 3 (grab Forall; inversion).
-
-do 2 (grab shape (fresh_in c' (atom _)); inversion).
-rewrite (@instantiate_renaming_eq _ _ _ c') => //.
-rewrite (@map_substitute_fresh_label c' a (map (substitute_label a b) Gamma)); by auto.
-
-rewrite instantiate_renaming_neq; by auto.
-Qed.
-
-
-Lemma derivation_exists_depth : forall (Gamma: list formula) (t: formula), derivation Gamma t -> exists (d: nat), derivation_depth d Gamma t.
-Proof.
-move => ? ?. elim => /=; clear.
-move => *. exists 0. by apply : dd_ax.
-intros *. move => _ [d1 ?] _ [d2 ?]. exists ((d1+d2).+1).
-apply : dd_elim_arr. 
-apply /derivation_depth_relax; try eassumption. apply /leP. unfoldN. by lia.
-apply /derivation_depth_relax; try eassumption. apply /leP. unfoldN. by lia.
-intros *. move => _ [d ?]. exists (d.+1). by apply : dd_intro_arr.
-intros *. move => _ [d Hd] H. elim : H d Hd.
-by eauto.
-clear. move => s t u *.
-grab derivation_depth. move /dd_elim_quant. move /(_ _ ltac:(eassumption)). by eauto.
-move => Gamma t _. have [a /Forall_cons_iff [? ?]] := exists_fresh (t :: Gamma).
-move /(_ a) => [d ?]. exists (d.+1). apply : dd_intro_quant. move => b.
-grab derivation_depth. move /(substitute_label_derivation_depth a b).
-congr derivation_depth.
-revert dependent Gamma.
-clear. elim => //=.
-move => s Gamma ? /Forall_cons_iff [? ?]. f_equal.
-by rewrite -substitute_fresh_label.
-by auto.
-by apply : rename_instantiation.
-Qed.
-
-Fixpoint instantiate_all (n : nat) (t : formula) : formula :=
-  match t with
-  | Formula.var m => if n <= m then Formula.atom (0,0) else t
-  | Formula.atom _ => t
-  | Formula.arr s t => Formula.arr (instantiate_all n s) (instantiate_all n t)
-  | Formula.quant s => Formula.quant (instantiate_all (n.+1) s)
-  end.
-
-
-Lemma lc_instantiate_all : forall t n, lc n t -> instantiate_all n t = t.
-Proof.
-elim => /=.
-intros *. inversion. by inspect_eqn.
-by auto.
-move => *. grab lc. inversion. f_equal; by auto.
-move => *. grab lc. inversion. f_equal; by auto.
-Qed.
-
-Lemma instantiate_all_instantiate : forall t, well_formed_formula t -> forall s n, (instantiate_all n (instantiate t n s)) = instantiate t n (instantiate_all n.+1 s).
-Proof.
-move => t ?.
-elim => /=.
-
-move => m n.
-have : (n = m) \/ (n < m)%coq_nat \/ (n > m)%coq_nat by lia.
-(case; last case) => ?; inspect_eqb; inspect_eqn => /=; try inspect_eqb; try inspect_eqn => //.
-grab well_formed_formula. move /Lc.relax. move /(_ n ltac:(lia)) => ?. by rewrite lc_instantiate_all.
-
-by auto.
-
-move => *. f_equal; auto.
-move => *. f_equal; auto.
-Qed.
-
-
-Lemma instantiate_all_derivation_depth : forall d Gamma t, derivation_depth d Gamma t -> derivation_depth d (map (instantiate_all 0) Gamma) (instantiate_all 0 t).
-Proof.
-elim.
-move => *. grab derivation_depth. inversion. apply : dd_ax.
-by apply in_map.
-
-move => d IH ? ?. inversion => /=.
-
-apply : dd_ax. by apply in_map.
-
-grab derivation_depth. move /IH => ?.
-apply : dd_elim_arr; eauto.
-have <- : forall n s t, instantiate_all n (Formula.arr s t) = Formula.arr (instantiate_all n s) (instantiate_all n t) by intros; reflexivity.
-by auto.
-
-apply : dd_intro_arr.
-rewrite -map_cons. by eauto.
-
-rewrite instantiate_all_instantiate; last done.
-apply : dd_elim_quant; eauto.
-have -> : (quant (instantiate_all 1 s)) = instantiate_all 0 (quant s) by reflexivity.
-by eauto.
-
-apply : dd_intro_quant => a.
-rewrite -instantiate_all_instantiate; last by constructor.
-by eauto.
-Qed.
-
-
-(*
-Fixpoint instantiate_all (n : nat) (t : formula) : formula :=
-  match t with
-  | Formula.var m => if n <= m then Formula.atom (0,0) else t
-  | Formula.atom _ => t
-  | Formula.arr s t => Formula.arr (instantiate_all n s) (instantiate_all n t)
-  | Formula.quant s => Formula.quant (instantiate_all (n.+1) s)
-  end.
-
-Lemma instantiate_all_derivation_depth : forall d Gamma t n, derivation_depth d Gamma t -> derivation_depth d (map (instantiate_all n) Gamma) (instantiate_all n t).
-Proof.
-elim.
-move => *. grab derivation_depth. inversion. apply : dd_ax.
-by apply in_map.
-
-move => d IH ? ? n. inversion => /=.
-
-apply : dd_ax. by apply in_map.
-
-grab derivation_depth. move /IH. move /(_ n) => ?.
-apply : dd_elim_arr; eauto.
-have <- : forall n s t, instantiate_all n (Formula.arr s t) = Formula.arr (instantiate_all n s) (instantiate_all n t) by intros; reflexivity.
-by auto.
-
-apply : dd_intro_arr.
-rewrite -map_cons. by eauto.
-
-have -> : (instantiate_all n (instantiate t 0 s)) =  instantiate t 0 (instantiate_all n s) by admit.
-apply : dd_elim_quant; eauto.
-have : n = (n.-1).+1 by admit. move => {2}->.
-have -> : (quant (instantiate_all n.-1.+1 s)) = instantiate_all n.-1 (quant s) by reflexivity.
-admit. (*NOOOO*)
-(*
-grab derivation_depth. move /IH. move /(_ n) => /=. (*maybe n-1*)
-move /dd_elim_quant. move /(_ _ ltac:(eassumption)).
-admit. (*doable?*)
-*)
-
-apply : dd_intro_quant => a.
-have -> : (instantiate (atom a) 0 (instantiate_all n.+1 s)) = instantiate_all n.+1 (instantiate (atom a) 0 s) by admit.
-apply : IH.
-by apply : IH.
-(*definitely doesn't work this way*)
-Admitted.
-*)
-
-
-(*doesnt work
-Lemma instantiate_derivation_depth : forall u, well_formed_formula u -> 
-  forall d Gamma t n, Forall (lc n) Gamma -> lc (n.+1) t -> derivation_depth d Gamma t -> derivation_depth d Gamma (instantiate u n t).
-Proof.
-move => u ?. elim.
-move => *. grab derivation_depth. inversion. apply : dd_ax.
-grab Forall. move /Forall_In. move /(_ _ ltac:(eassumption)). by move /Lc.instantiate_eq => ->.
-
-move => d IH ? ? n ? ?. inversion => /=.
-
-apply : dd_ax.
-grab Forall. move /Forall_In. move /(_ _ ltac:(eassumption)). by move /Lc.instantiate_eq => ->.
-
-grab derivation_depth. move /IH. move /(_ n ltac:(eassumption)) => ?.
-
-admit. (*maybe double by internal induction
-apply : dd_elim_arr.
-have <- : forall n s t, instantiate u n (Formula.arr s t) = Formula.arr (instantiate u n s) (instantiate u n t) by intros; reflexivity.
-by auto.*)
-
-apply : dd_intro_arr.
-grab lc. inversion.
-apply /IH.
-admit.
-
-grab derivation_depth. move /IH. move /(_ (n.-1) ltac:(assumption)) => /=. (*maybe n-1*)
-move /dd_elim_quant. move /(_ _ ltac:(eassumption)).
-admit. (*doable?*)
-
-apply : dd_intro_quant => a. rewrite instantiate_instantiate => //; last by constructor.
-by apply : IH.
-(*definitely doesn't work this way*)
-Admitted.
-*)
-
-Lemma lc_map_instantiate_all : forall Gamma, Forall well_formed_formula Gamma -> map (instantiate_all 0) Gamma = Gamma.
-Proof.
-elim => //=.
-move => ? ? ? /Forall_cons_iff => [[? ?]].
-f_equal; auto.
-by apply lc_instantiate_all.
-Qed.
-
-Lemma instantiate_all_lc : forall t n, lc n (instantiate_all n t).
-Proof.
-elim => /=.
-move => m n.
-have : (n <= m)%coq_nat \/ (m < n)%coq_nat by lia.
-case => ?; inspect_eqn; by constructor.
-move => *. by constructor.
-move => *. constructor; by auto.
-move => *. constructor; by auto.
-Qed.
+Import InstantiateAll.
+Import DerivationIffDerivationDepth.
 
 Theorem derivation_to_iipc2 : forall (Gamma: list formula) (t: formula), derivation Gamma t -> Forall well_formed_formula Gamma -> well_formed_formula t -> iipc2 Gamma t.
 Proof.
@@ -2113,6 +1737,8 @@ apply : iipc2_intro_quant => //.
 apply : IH => //.
 apply : Lc.instantiate_pred; by [| constructor].
 Qed.
+
+End derivation_to_iipc2.
 
 
 Theorem normal_derivation_completeness : forall (Gamma: list formula) (t: formula), 
