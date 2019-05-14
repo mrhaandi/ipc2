@@ -318,9 +318,16 @@ Qed.
 Lemma weakening : ∀ (Γ Δ: list formula) (t: formula), 
   derivation Γ t → (∀ (s : formula), In s Γ → In s Δ) → derivation Δ t.
 Proof.
-intros *.
-move /normal_derivation_completeness; case.
-eauto using normal_derivation_soundness, normal_weakening.
+move => Gamma Delta t. move /derivation_exists_depth => [d Hd] H.
+apply : (@derivation_hide_depth d).
+elim : d Gamma Delta t Hd H => *; grab derivation_depth; inversion.
+all: eauto using derivation_depth.
+apply : dd_intro_arr.
+grab derivation_depth. grab where derivation_depth. move => IH /IH.
+apply.
+move => u. inversion.
+by constructor.
+apply : in_cons. by auto.
 Qed.
 
 
