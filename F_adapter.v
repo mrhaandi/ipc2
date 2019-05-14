@@ -2051,18 +2051,54 @@ by apply : IH.
 Admitted.
 *)
 
+Lemma lc_map_instantiate_all : forall Gamma, Forall well_formed_formula Gamma -> map (instantiate_all 0) Gamma = Gamma.
+Proof.
+elim => //=.
+move => ? ? ? /Forall_cons_iff => [[? ?]].
+f_equal; auto.
+by apply lc_instantiate_all.
+Qed.
+
+Lemma instantiate_all_lc : forall t n, lc n (instantiate_all n t).
+Proof.
+elim => /=.
+move => m n.
+have : (n <= m)%coq_nat \/ (m < n)%coq_nat by lia.
+case => ?; inspect_eqn; by constructor.
+move => *. by constructor.
+move => *. constructor; by auto.
+move => *. constructor; by auto.
+Qed.
+
 Theorem derivation_to_iipc2_2 : forall (Gamma: list formula) (t: formula), derivation Gamma t -> Forall well_formed_formula Gamma -> well_formed_formula t -> iipc2 Gamma t.
 Proof.
-move => ? ?. elim => /=; clear.
-intros. by apply : iipc2_ax.
-intros. admit. (*doable by better induction on derivation depth apply : iipc2_elim_arr; eauto.*)
-intros. grab well_formed_formula. inversion. apply : iipc2_intro_arr. have : Forall well_formed_formula (s :: Γ) by constructor. auto.
-intros *. move => _ H1 H2 /H1. elim : H2 => //.
-clear. move => s t u *.
-grab iipc2. admit. (* doable move /iipc2_elim_quant. by move /(_ _ ltac:(eassumption)).*)
-move => Gamma t _ IH /IH. have [a /Forall_cons_iff [? ?]] := exists_fresh (t :: Gamma).
-move /(_ a). admit. (*doable
-intros. rewrite -(@bind_instantiate a _ 0 ltac:(eassumption)). by apply : iipc2_intro_quant.*)
-Admitted.
+move => Gamma t.
+move /derivation_exists_depth. case => d. elim : d Gamma t.
 
+intros *. inversion => *. by apply : iipc2_ax.
+
+move => d IH Gamma t. inversion.
+
+move => *. by apply : iipc2_ax.
+
+move => *. grab derivation_depth => /instantiate_all_derivation_depth. grab derivation_depth => /instantiate_all_derivation_depth.
+move => /=. rewrite (@lc_instantiate_all t) //. rewrite (lc_map_instantiate_all) //. 
+move /IH. move /(_ ltac:(assumption)). 
+match goal with |- context[instantiate_all 0 ?s] => pose s' := (instantiate_all 0 s) end.
+have ? : well_formed_formula s' by apply : instantiate_all_lc.
+move /(_ ltac:(by constructor)) => *.
+apply : iipc2_elim_arr; by eauto.
+
+move => ?. inversion. apply : iipc2_intro_arr. apply : IH => //. by constructor.
+
+move => ? /Lc.succ_instantiate. move /(_ ltac:(assumption)) => /= ?.
+apply : iipc2_elim_quant => //. apply : IH; by [| constructor].
+
+move => ?. inversion.
+have [a /Forall_cons_iff [? ?]] := exists_fresh (s :: Gamma).
+rewrite -[s in quant s](@bind_instantiate a _ 0) //.
+apply : iipc2_intro_quant => //.
+apply : IH => //.
+apply : Lc.instantiate_pred; by [| constructor].
+Qed.
 
