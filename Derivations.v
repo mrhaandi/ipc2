@@ -36,7 +36,19 @@ Inductive normal_derivation : nat → list formula → formula → Prop :=
   | derive_atom : ∀ (n : nat) (Γ: list formula) (a: label) (s: formula) (params: list formula), 
       In s Γ → Formula.chain s a params → (Forall (normal_derivation n Γ) (params)) → normal_derivation (S n) Γ (Formula.atom a).
 
-Axiom normal_derivation_completeness : forall (Γ: list formula) (s: formula), derivation Γ s → exists (n : nat), normal_derivation n Γ s.
+Definition lnd (Γ: list formula) (t: formula) := exists n, normal_derivation n Γ t.
+
+(*
+(*beta-normal eta-long iipc2 derivations without regard for well-formedness*)
+Inductive lnd : list formula → formula → Prop :=
+  | lnd_arr : ∀ (Γ: list formula) (s t: formula), lnd (s :: Γ) t → lnd Γ (Formula.arr s t)
+  | lnd_quant : ∀ (Γ: list formula) (s: formula), (forall (a: label), lnd Γ (instantiate (atom a) 0 s)) → lnd Γ (Formula.quant s)
+  | lnd_atom : ∀ (Γ: list formula) (a: label) (s: formula) (params: list formula), 
+      In s Γ → Formula.chain s a params → (Forall (lnd Γ) (params)) → lnd Γ (Formula.atom a).
+*)
+
+
+(*Axiom normal_derivation_completeness : forall (Γ: list formula) (s: formula), derivation Γ s → exists (n : nat), normal_derivation n Γ s.*)
 
 (*tries to solve derivation Γ s automatically*)
 Ltac derivation_rule := first
@@ -112,26 +124,26 @@ End DerivationIffDerivationDepth.
 
 Import DerivationIffDerivationDepth.
 
-(*inversion lemmas*)
-Lemma inv_arr : forall (Γ : list formula) (s t : formula),
-  derivation Γ (arr s t) -> derivation (s :: Γ) t.
+Lemma relax_depth_normal_derivation : forall (n m : nat) (Γ : list formula) (s : formula), 
+  normal_derivation n Γ s -> (n <= m) -> normal_derivation m Γ s.
 Proof.
-intros *.
-move /normal_derivation_completeness => [? H].
-inversion_clear H.
-apply: normal_derivation_soundness; eassumption.
-Qed.
+elim /lt_wf_ind.
+move => n IH. intros.
+grab normal_derivation. inversion.
 
-Lemma inv_atom : forall (Γ : list formula) (a : label), derivation Γ (atom a) -> 
-  exists (s : formula) (params : list formula), In s Γ /\ chain s a params /\ (Forall (derivation Γ) (params)).
-Proof.
-intros *.
-move /normal_derivation_completeness => [? H].
-inversion_clear H.
-match goal with | [H : Forall _ _ |- _] => eapply Forall_impl in H; first last end.
-intros.
-eapply normal_derivation_soundness. eassumption.
-exists s, params. auto.
+all: have : m = S (Nat.pred m) by lia.
+all: move => ->.
+
+constructor.
+apply : IH; try eassumption; lia.
+
+constructor.
+move => a. grab where normal_derivation. move /(_ a) => ?.
+apply : IH; try eassumption; lia.
+
+apply : derive_atom; try eassumption.
+apply : Forall_impl; last eassumption.
+intros. apply : IH; try eassumption; lia.
 Qed.
 
 Lemma inv_normal_quant : forall (n : nat) (Γ: list formula) (s : formula), normal_derivation n Γ (quant s) ->
@@ -142,14 +154,7 @@ inversion_clear H.
 eexists; split; [reflexivity | assumption].
 Qed.
 
-Lemma inv_quant : forall (Γ: list formula) (s : formula), derivation Γ (quant s) ->
-  (forall (a: label), derivation Γ (instantiate (atom a) 0 s)).
-Proof.
-intros *.
-move /normal_derivation_completeness => [n HD].
-move /inv_normal_quant : HD => [m [? ?]].
-eauto using normal_derivation_soundness.
-Qed.
+
 
 Lemma inv_normal_arr : forall (n : nat) (Γ: list formula) (s t : formula), normal_derivation n Γ (arr s t) ->
   exists (m : nat), n = S m /\ normal_derivation m (s :: Γ) t.
@@ -182,18 +187,7 @@ Ltac decompose_chain :=
     end
   end).
 
-Ltac decompose_derivation := 
-  do ? (
-  match goal with
-  | [H : derivation _ ?s |- _] => 
-    match eval hnf in s with
-    | arr _ _ => move /inv_arr : H => H
-    | atom _ => 
-      let s := fresh in 
-      let H' := fresh in
-      move /inv_atom : H => [s [? [H' [? ?]]]]
-    end
-  end).
+
 
 Ltac decompose_contains :=
   match goal with
@@ -266,7 +260,19 @@ eauto.
 apply : derive_atom; try eassumption.
 Qed.
 
-
+(*the usual presentation of intro_quant*)
+Lemma normal_intro_quant_fresh : forall (s: formula) (Γ : list formula) (a : label) (n : nat), 
+  Forall (fresh_in a) Γ -> fresh_in a s ->
+  normal_derivation n Γ (instantiate (atom a) 0 s) -> normal_derivation (S n) Γ (Formula.quant s).
+Proof.
+move => s Γ a n H *.
+constructor => b.
+grab normal_derivation. move /(substitute_normal_derivation a b).
+rewrite rename_instantiation; first last. done.
+rewrite <- map_substitute_fresh_label.
+apply. done.
+Qed.
+(*
 Lemma substitute_derivation_bindable : forall (s : formula) (Γ : list formula) (a b : label), 
   Forall (fresh_in a) Γ -> derivation Γ s -> derivation Γ (substitute_label a b s).
 Proof.
@@ -276,7 +282,7 @@ move => ->.
 grab derivation; move /normal_derivation_completeness => [? ?].
 eauto using normal_derivation_soundness, substitute_normal_derivation.
 Qed.
-
+*)
 
 (*the usual presentation of intro_quant*)
 Theorem intro_quant_fresh : ∀ (s: formula) (Γ : list formula) (a : label), 

@@ -575,10 +575,6 @@ Qed.
 
 Print Assumptions iipc2_to_f.
 
-(*chain s a params morally means that s can be instanciated as p1 -> ... -> pn -> a*)
-Inductive partial_chain (s t : formula) : list formula -> Prop :=
-  | partial_chain_nil : contains s t -> partial_chain s t List.nil
-  | partial_chain_cons : forall (s' t': formula) (ts: list formula), contains s (arr s' t') -> partial_chain t' t ts -> partial_chain s t (s' :: ts).
 
 
 Lemma typ_to_formula : forall ty labeling n, bijective labeling -> exists t, ty = (formula_to_typ labeling n t) /\ lc n t.
@@ -600,35 +596,6 @@ move : (IH ltac:(assumption) (n.+1) ltac:(assumption)) => [t [-> ?]].
 exists (Formula.quant t). split; by constructor.
 Qed.
 
-
-Lemma partial_chain_arr : forall ts s t u, partial_chain s (arr t u) ts -> partial_chain s u (ts ++ [::t]).
-Proof.
-elim.
-intros *; inversion.
-apply : partial_chain_cons; try eassumption + constructor.
-constructor.
-
-move => t' ts IH.
-intros *; inversion.
-apply : partial_chain_cons; try eassumption.
-by apply IH.
-Qed.
-
-
-Lemma contains_transitivity : forall s t u, contains s t -> contains t u -> contains s u.
-Proof.
-intros *; elim => //.
-intros; apply : contains_trans; eauto.
-Qed.
-
-
-Lemma partial_chain_contains : forall s t t' ts, partial_chain s t ts -> contains t t' -> partial_chain s t' ts.
-Proof.
-intros *.
-elim => *.
-constructor. apply : contains_transitivity; eauto.
-apply : partial_chain_cons; eauto.
-Qed.
 
 
 Lemma shift_formula_to_typ labeling : forall t n m, lc m t -> shift_typ n m (formula_to_typ labeling m t) = formula_to_typ labeling (m+n) t.
@@ -1267,21 +1234,6 @@ move /(eta_expand_rec_2 (eta_deficiency ctx M true)). move /(_ ltac:(assumption)
 eexists. split. eassumption. split. eassumption. unfoldN. lia.
 Qed.
 
-Lemma partial_chain_atom : forall a ts s, partial_chain s (atom a) ts <-> chain s a ts.
-Proof.
-move => a; elim.
-intros *.
-split; inversion; by constructor.
-
-move => t ts IH s.
-split.
-inversion. apply : chain_cons.
-eassumption. by rewrite <- IH.
-
-inversion. apply : partial_chain_cons.
-eassumption. by rewrite -> IH.
-Qed.
-
 
 Lemma head_form_atom_formula : forall M ctx t, head_form M -> normal_long_derivation ctx M t -> exists n, t = tyvar n.
 Proof.
@@ -1324,71 +1276,6 @@ move => M t. case : (typing t (uabs M)) => //.
 Qed.
 
 
-Lemma relax_depth_normal_derivation : forall (n m : nat) (Γ : list formula) (s : formula), 
-  normal_derivation n Γ s -> (n <= m)%coq_nat -> normal_derivation m Γ s.
-Proof.
-elim /lt_wf_ind.
-move => n IH. intros.
-grab normal_derivation. inversion.
-
-all: have : m = S (Nat.pred m) by lia.
-all: move => ->.
-
-constructor.
-apply : IH; try eassumption; lia.
-
-constructor.
-move => a. grab where normal_derivation. move /(_ a) => ?.
-apply : IH; try eassumption; lia.
-
-apply : derive_atom; try eassumption.
-apply : Forall_impl; last eassumption.
-intros. apply : IH; try eassumption; lia.
-Qed.
-
-
-Lemma contains_wff : forall s t, contains s t -> well_formed_formula s -> well_formed_formula t.
-Proof.
-intros *. elim.
-auto.
-
-intros. grab well_formed_formula where quant. inversion.
-
-intros. grab where well_formed_formula. apply.
-grab lc. move /Lc.instantiate_pred. by apply. 
-Qed.
-
-Lemma partial_chain_wff : forall ts s t, well_formed_formula s -> partial_chain s t ts -> well_formed_formula t.
-Proof.
-elim.
-intros. grab partial_chain. inversion.
-apply : contains_wff; eassumption.
-
-move => u ts IH.
-intros. grab partial_chain. inversion.
-apply : IH; last eassumption.
-grab contains. move /contains_wff.
-nip; first auto. by inversion.
-Qed.
-
-Lemma partial_chain_param_wff : forall ts s t u, well_formed_formula s -> partial_chain s t ts -> In u ts -> well_formed_formula u.
-Proof.
-elim.
-intros. grab In. inversion.
-
-move => t' ts IH.
-intros. grab partial_chain. inversion.
-grab In. case.
-
-intro. subst.
-grab contains. move /contains_wff.
-nip; first auto. by inversion.
-
-grab partial_chain.
-move /IH. move => H' /H'. apply.
-grab contains. move /contains_wff.
-nip; first auto. by inversion.
-Qed.
 
 Definition big_sum (n : nat) : nat := nat_rect (fun _ => nat) 0 (fun i m => m + i.+1) n.
 
@@ -1568,20 +1455,6 @@ apply : IH2 => b. move /llf. by inversion.
 
 move => ? IH n llf. f_equal.
 apply : IH => b. move /llf. by inversion.
-Qed.
-
-
-(*the usual presentation of intro_quant*)
-Lemma normal_intro_quant_fresh : forall (s: formula) (Γ : list formula) (a : label) (n : nat), 
-  Forall (fresh_in a) Γ -> fresh_in a s ->
-  normal_derivation n Γ (instantiate (atom a) 0 s) -> normal_derivation (S n) Γ (Formula.quant s).
-Proof.
-move => s Γ a n H *.
-constructor => b.
-grab normal_derivation. move /(substitute_normal_derivation a b).
-rewrite rename_instantiation; first last. done.
-rewrite <- map_substitute_fresh_label.
-apply. done.
 Qed.
 
 

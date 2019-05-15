@@ -473,3 +473,107 @@ move => b ?. inversion. by rewrite Label.neq_neqb.
 move => *. grab fresh_in. inversion. f_equal; auto.
 move => *. grab fresh_in. inversion. f_equal; auto.
 Qed.
+
+Lemma contains_wff : forall s t, contains s t -> well_formed_formula s -> well_formed_formula t.
+Proof.
+intros *. elim.
+auto.
+
+intros. grab well_formed_formula where quant. inversion.
+
+intros. grab where well_formed_formula. apply.
+grab lc. move /Lc.instantiate_pred. by apply. 
+Qed.
+
+
+(*chain s a params morally means that s can be instanciated as p1 -> ... -> pn -> a*)
+Inductive partial_chain (s t : formula) : list formula -> Prop :=
+  | partial_chain_nil : contains s t -> partial_chain s t List.nil
+  | partial_chain_cons : forall (s' t': formula) (ts: list formula), contains s (arr s' t') -> partial_chain t' t ts -> partial_chain s t (s' :: ts).
+
+
+Lemma partial_chain_arr : forall ts s t u, partial_chain s (arr t u) ts -> partial_chain s u (ts ++ [t]).
+Proof.
+elim.
+intros *; inversion.
+apply : partial_chain_cons; try eassumption + constructor.
+constructor.
+
+move => t' ts IH.
+intros *; inversion.
+apply : partial_chain_cons; try eassumption.
+by apply IH.
+Qed.
+
+
+Lemma contains_transitivity : forall s t u, contains s t -> contains t u -> contains s u.
+Proof.
+intros *; elim => //.
+intros; apply : contains_trans; eauto.
+Qed.
+
+
+Lemma partial_chain_contains : forall s t t' ts, partial_chain s t ts -> contains t t' -> partial_chain s t' ts.
+Proof.
+intros *.
+elim => *.
+constructor. apply : contains_transitivity; eauto.
+apply : partial_chain_cons; eauto.
+Qed.
+
+
+Lemma partial_chain_atom : forall a ts s, partial_chain s (atom a) ts <-> chain s a ts.
+Proof.
+move => a; elim.
+intros *.
+split; inversion; by constructor.
+
+move => t ts IH s.
+split.
+inversion. apply : chain_cons.
+eassumption. by rewrite <- IH.
+
+inversion. apply : partial_chain_cons.
+eassumption. by rewrite -> IH.
+Qed.
+
+
+Lemma partial_chain_wff : forall ts s t, well_formed_formula s -> partial_chain s t ts -> well_formed_formula t.
+Proof.
+elim.
+intros. grab partial_chain. inversion.
+apply : contains_wff; eassumption.
+
+move => u ts IH.
+intros. grab partial_chain. inversion.
+apply : IH; last eassumption.
+grab contains. move /contains_wff.
+nip; first auto. by inversion.
+Qed.
+
+Lemma partial_chain_param_wff : forall ts s t u, well_formed_formula s -> partial_chain s t ts -> In u ts -> well_formed_formula u.
+Proof.
+elim.
+intros. grab In. inversion.
+
+move => t' ts IH.
+intros. grab partial_chain. inversion.
+grab In. case.
+
+intro. subst.
+grab contains. move /contains_wff.
+nip; first auto. by inversion.
+
+grab partial_chain.
+move /IH. move => H' /H'. apply.
+grab contains. move /contains_wff.
+nip; first auto. by inversion.
+Qed.
+
+
+Lemma chain_param_wff : forall s a ts, well_formed_formula s -> chain s a ts -> Forall well_formed_formula ts.
+Proof.
+move => *. grab chain. move /partial_chain_atom. move /partial_chain_param_wff.
+move /(_ _ ltac:(assumption)).
+by move /Forall_In_iff.
+Qed.

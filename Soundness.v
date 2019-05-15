@@ -11,6 +11,7 @@ Set Maximal Implicit Insertion.
 
 Require Import FormulaFacts.
 Require Import Derivations.
+Require Import DerivationsFacts.
 Require Import Encoding.
 Require Import UserTactics.
 Require Import Psatz. (*lia : linear integer arithmetic*)
@@ -113,28 +114,139 @@ Ltac generalize_ΓI :=
     end
   end.
 
+
+Ltac decompose_derivation := 
+  match goal with
+  | [H : derivation _ ?s |- _] => 
+    match eval hnf in s with
+    | arr _ _ => (move /inv_arr : H; apply : unnest; [| apply : unnest]); first last; first move => H
+    | atom _ => 
+      let s := fresh in 
+      let H' := fresh in
+      move /inv_atom : H; apply : unnest; first last; first move => [s [? [H' [? ?]]]]
+    end
+  end.
+
+Lemma wff_arr : forall s t, well_formed_formula s -> well_formed_formula t -> well_formed_formula (arr s t).
+Proof. intros. by constructor. Qed.
+
+Lemma wff_GammaU : forall Gamma, (forall (s : formula), In s Gamma → represents_nat s) -> Forall well_formed_formula Gamma.
+Proof.
+move => ?. move /Forall_In_iff.
+apply /Forall_impl. clear. move => s.
+move => [? [? ?]]. subst.
+by do ? constructor.
+Qed.
+
+Lemma wff_GammaS : forall Gamma, (forall (s : formula), In s Gamma → encodes_sum s) -> Forall well_formed_formula Gamma.
+Proof.
+move => ?. move /Forall_In_iff.
+apply /Forall_impl. clear. move => s.
+firstorder subst.
+by do ? constructor.
+Qed.
+
+Lemma wff_GammaP : forall Gamma, (forall (s : formula), In s Gamma → encodes_prod s) -> Forall well_formed_formula Gamma.
+Proof.
+move => ?. move /Forall_In_iff.
+apply /Forall_impl. clear. move => s.
+firstorder subst.
+by do ? constructor.
+Qed.
+
+Lemma wff_U : forall s, well_formed_formula (U s) -> well_formed_formula s.
+Proof.
+move => ?. inversion.
+by do 3 (grab lc; inversion).
+Qed.
+
+Lemma wff_S1 : forall s1 s2 s3, well_formed_formula (S s1 s2 s3) -> well_formed_formula s1.
+Proof. move => s1 ? ?. inversion. by do 2 (grab lc where s1; inversion). Qed.
+
+Lemma wff_S2 : forall s1 s2 s3, well_formed_formula (S s1 s2 s3) -> well_formed_formula s2.
+Proof. move => ? s2 ?. inversion. by do 3 (grab lc where s2; inversion). Qed.
+
+Lemma wff_S3 : forall s1 s2 s3, well_formed_formula (S s1 s2 s3) -> well_formed_formula s3.
+Proof. move => ? ? s3. inversion. by do 4 (grab lc where s3; inversion). Qed.
+
+Lemma wff_P1 : forall s1 s2 s3, well_formed_formula (P s1 s2 s3) -> well_formed_formula s1.
+Proof. move => s1 ? ?. inversion. by do 2 (grab lc where s1; inversion). Qed.
+
+Lemma wff_P2 : forall s1 s2 s3, well_formed_formula (P s1 s2 s3) -> well_formed_formula s2.
+Proof. move => ? s2 ?. inversion. by do 3 (grab lc where s2; inversion). Qed.
+
+Lemma wff_P3 : forall s1 s2 s3, well_formed_formula (P s1 s2 s3) -> well_formed_formula s3.
+Proof. move => ? ? s3. inversion. by do 4 (grab lc where s3; inversion). Qed.
+
+Lemma wff_InGammaS1 : forall s1 s2 s3 Gamma, (forall (s : formula), In s Gamma → encodes_sum s) -> In (S s1 s2 s3) Gamma -> well_formed_formula s1.
+Proof. move => ? ? ? ? H /H. firstorder subst. grab @eq. inversion. by do ? constructor. Qed.
+
+Lemma wff_InGammaS2 : forall s1 s2 s3 Gamma, (forall (s : formula), In s Gamma → encodes_sum s) -> In (S s1 s2 s3) Gamma -> well_formed_formula s2.
+Proof. move => ? ? ? ? H /H. firstorder subst. grab @eq. inversion. by do ? constructor. Qed.
+
+Lemma wff_InGammaS3 : forall s1 s2 s3 Gamma, (forall (s : formula), In s Gamma → encodes_sum s) -> In (S s1 s2 s3) Gamma -> well_formed_formula s3.
+Proof. move => ? ? ? ? H /H. firstorder subst. grab @eq. inversion. by do ? constructor. Qed.
+
+Lemma wff_InGammaP1 : forall s1 s2 s3 Gamma, (forall (s : formula), In s Gamma → encodes_prod s) -> In (P s1 s2 s3) Gamma -> well_formed_formula s1.
+Proof. move => ? ? ? ? H /H. firstorder subst. grab @eq. inversion. by do ? constructor. Qed.
+
+Lemma wff_InGammaP2 : forall s1 s2 s3 Gamma, (forall (s : formula), In s Gamma → encodes_prod s) -> In (P s1 s2 s3) Gamma -> well_formed_formula s2.
+Proof. move => ? ? ? ? H /H. firstorder subst. grab @eq. inversion. by do ? constructor. Qed.
+
+Lemma wff_InGammaP3 : forall s1 s2 s3 Gamma, (forall (s : formula), In s Gamma → encodes_prod s) -> In (P s1 s2 s3) Gamma -> well_formed_formula s3.
+Proof. move => ? ? ? ? H /H. firstorder subst. grab @eq. inversion. by do ? constructor. Qed.
+
+Ltac inspect_wff :=
+  do ? (
+    lazymatch goal with
+    | [H : well_formed_formula (U ?s) |- well_formed_formula ?s] => by apply : (wff_U H)
+    | [H : well_formed_formula (S ?s _ _) |- well_formed_formula ?s] => by apply : (wff_S1 H)
+    | [H : well_formed_formula (S _ ?s _) |- well_formed_formula ?s] => by apply : (wff_S2 H)
+    | [H : well_formed_formula (S _ _ ?s) |- well_formed_formula ?s] => by apply : (wff_S3 H)
+    | [H : well_formed_formula (P ?s _ _) |- well_formed_formula ?s] => by apply : (wff_P1 H)
+    | [H : well_formed_formula (P _ ?s _) |- well_formed_formula ?s] => by apply : (wff_P2 H)
+    | [H : well_formed_formula (P _ _ ?s) |- well_formed_formula ?s] => by apply : (wff_P3 H)
+    | [H1 : forall (s : formula), In s ?Gamma → encodes_sum s, H2 : In (S ?s _ _) ?Gamma |- well_formed_formula ?s] => by apply : (wff_InGammaS1 H1 H2)
+    | [H1 : forall (s : formula), In s ?Gamma → encodes_sum s, H2 : In (S _ ?s _) ?Gamma |- well_formed_formula ?s] => by apply : (wff_InGammaS2 H1 H2)
+    | [H1 : forall (s : formula), In s ?Gamma → encodes_sum s, H2 : In (S _ _ ?s) ?Gamma |- well_formed_formula ?s] => by apply : (wff_InGammaS3 H1 H2)
+    | [H1 : forall (s : formula), In s ?Gamma → encodes_prod s, H2 : In (P ?s _ _) ?Gamma |- well_formed_formula ?s] => by apply : (wff_InGammaP1 H1 H2)
+    | [H1 : forall (s : formula), In s ?Gamma → encodes_prod s, H2 : In (P _ ?s _) ?Gamma |- well_formed_formula ?s] => by apply : (wff_InGammaP2 H1 H2)
+    | [H1 : forall (s : formula), In s ?Gamma → encodes_prod s, H2 : In (P _ _ ?s) ?Gamma |- well_formed_formula ?s] => by apply : (wff_InGammaP3 H1 H2)
+    | [|- Forall well_formed_formula calC] => by apply calC_wff
+    | [|- Forall well_formed_formula []] => constructor
+    | [|- Forall well_formed_formula (_ :: _)] => constructor
+    | [|- Forall well_formed_formula (_ ++ _)] => apply /Forall_app_iff; split
+    | [_ :  forall (s : formula), In s ?Gamma → represents_nat s |- Forall well_formed_formula ?Gamma] => by apply : wff_GammaU
+    | [_ :  forall (s : formula), In s ?Gamma → encodes_sum s |- Forall well_formed_formula ?Gamma] => by apply : wff_GammaS
+    | [_ :  forall (s : formula), In s ?Gamma → encodes_prod s |- Forall well_formed_formula ?Gamma] => by apply : wff_GammaP
+    | [|- well_formed_formula ?s] => 
+      match eval hnf in s with
+      | (arr _ _) => apply : wff_arr
+      | (atom _) => by constructor
+      end
+    end).
+
+
 Lemma get_interpretation : forall (s : formula) (ΓU : list formula),
   (forall {s : formula}, In s ΓU -> represents_nat s) ->
+  well_formed_formula (U s) ->
   derivation (ΓU ++ [triangle; a_s; a_p]) (U s) ->
   exists (m : nat), interpretation s m /\ m > 0.
 Proof.
-move => s ΓU HΓU HD.
-decompose_derivation.
+move => s ΓU HΓU ? ?.
+decompose_derivation. decompose_derivation. decompose_derivation.
 filter_context_chain => ?.
 match goal with [ _ : In ?s ΓU |- _] => have : represents_nat s by auto end.
 move => [m [? ?]]; subst.
 exists m; split; last done.
-
-do ? (grab chain; move /chain_arr => [? [? ?]]).
-grab chain; move /chain_atom => [? _].
-subst.
+decompose_chain.
 decompose_Forall.
 do 2 generalize_ΓU.
-decompose_derivation.
+decompose_derivation. decompose_derivation. decompose_derivation. decompose_derivation.
 do 2 filter_context_chain.
 decompose_Forall.
 grab derivation; grab derivation => HD2 HD1.
-constructor.
+constructor. by inspect_wff.
 (*show +s -> +m*)
 do 2 (apply intro_arr).
 eapply (context_generalization (Δ := (represent_nat m :: to_dagger s :: calC))) in HD1.
@@ -145,20 +257,110 @@ intros; by derivation_rule.
 eapply (context_generalization (Δ := ((to_dagger (represent_nat m)) :: calC))) in HD2.
 2 : { intros; filter_context_derivation. }
 derivation_rule.
+all: by inspect_wff.
 Qed.
+
+
+Lemma chain_represents_nat : forall s params a, chain s a params -> represents_nat s -> a = get_label a_u.
+Proof.
+intros * => ? [? [? ?]]. subst. by decompose_chain.
+Qed.
+
+(*cannt show well-formedness
+Lemma get_normal_interpretation : forall (n: nat) (s : formula) (ΓU : list formula),
+  (forall {s : formula}, In s ΓU -> represents_nat s) ->
+  normal_derivation n (ΓU ++ [triangle; a_s; a_p]) (U s) ->
+  exists (m : nat), interpretation s m /\ m > 0.
+Proof.
+move => n s ΓU HΓU ?.
+decompose_normal_derivation.
+filter_context_chain => ?.
+match goal with [ _ : In ?s ΓU |- _] => have : represents_nat s by auto end.
+move => [m [? ?]]; subst.
+exists m; split; last done.
+decompose_chain.
+decompose_Forall.
+decompose_normal_derivation.
+do 2 filter_context_chain.
+decompose_Forall.
+grab derivation; grab derivation => HD2 HD1.
+constructor. by inspect_wff.
+(*show +s -> +m*)
+do 2 (apply intro_arr).
+eapply (context_generalization (Δ := (represent_nat m :: to_dagger s :: calC))) in HD1.
+2 : { intros; filter_context_derivation. }
+have : derivation (represent_nat m :: to_dagger s :: calC) (to_dagger s) by derivation_rule.
+intros; by derivation_rule.
+(*show +m -> +s*)
+eapply (context_generalization (Δ := ((to_dagger (represent_nat m)) :: calC))) in HD2.
+2 : { intros; filter_context_derivation. }
+derivation_rule.
+all: by inspect_wff.
+
+
+all: move /chain_represents_nat; by move /(_ ltac:(auto)).
+Qed.
+*)
+
+
+
+
 
 Lemma derivation_atom_eq : forall (a b : label), ~(In (Formula.atom a) (dagger :: calC)) -> ~(In (Formula.atom b) (dagger :: calC)) -> 
   derivation calC (Formula.arr (to_dagger (Formula.atom a)) (to_dagger (Formula.atom b))) -> a = b.
 Proof.
 intros.
 decompose_derivation.
+decompose_derivation.
+decompose_derivation.
 filter_context_chain. exfalso; intuition.
 decompose_Forall.
 decompose_derivation.
 filter_context_chain; try (firstorder done).
+all: by inspect_wff.
+Qed.
+
+Lemma chain_intro_sum (params : list formula) : chain s_x_s (get_label triangle) params -> 
+  exists (s1 s2 s3 s4 s5 : formula), 
+    (params = [U s1; U s2; U s3; U s4; U s5; S s1 s2 s3; S s2 one s4; S s3 one s5; Formula.arr (S s1 s4 s5) triangle]) /\ Forall well_formed_formula params.
+Proof.
+case; intros; first do ? decompose_contains.
+grab chain; do ? decompose_contains.
+move => ?; decompose_chain.
+do 5 eexists.
+split => //=.
+rewrite ? Lc.instantiate_eq0 //.
+do ? constructor; assumption.
+Qed.
+
+Lemma chain_intro_prod (params : list formula) : chain s_x_p (get_label triangle) params -> 
+  exists (s1 s2 s3 s4 s5 : formula), 
+    (params = [U s1; U s2; U s3; U s4; U s5; P s1 s2 s3; S s2 one s4; S s3 s1 s5; Formula.arr (P s1 s4 s5) triangle]) /\ Forall well_formed_formula params.
+Proof.
+case; intros; first do ? decompose_contains.
+grab chain; do ? decompose_contains.
+move => ?; decompose_chain.
+do 5 eexists.
+split => //=.
+rewrite ? Lc.instantiate_eq0 //.
+do ? constructor; assumption.
 Qed.
 
 
+Lemma chain_intro_element (params : list formula): chain s_x_u (get_label triangle) params -> 
+  exists (s : formula), lc 0 s /\
+    (params = [U s; quant ( arr (U (var 0)) (arr (S s one (var 0)) (arr (P (var 0) one (var 0)) triangle)))]) /\ Forall well_formed_formula params.
+Proof.
+case; intros; first do ? decompose_contains.
+grab chain; do ? decompose_contains.
+move => ?; decompose_chain.
+eexists. split; [eassumption | ].
+split => //=.
+grab lc. move /duplicate => [? /Lc.relax]. move /(_ 1 ltac:(auto)) => ?.
+by (do ? constructor).
+Qed.
+
+(*
 Lemma chain_intro_sum (params : list formula) : chain s_x_s (get_label triangle) params -> 
   exists (s1 s2 s3 s4 s5 : formula), 
     (params = [U s1; U s2; U s3; U s4; U s5; S s1 s2 s3; S s2 one s4; S s3 one s5; Formula.arr (S s1 s4 s5) triangle]).
@@ -190,7 +392,7 @@ grab chain; do ? decompose_contains.
 move => ?; decompose_chain.
 eexists. by split; [eassumption | ].
 Qed.
-
+*)
 
 Lemma derivation_arr_trans : forall (Γ : list formula) (s t u : formula),
   derivation Γ (arr s t) -> derivation Γ (arr t u) -> derivation Γ (arr s u).
@@ -207,14 +409,13 @@ Qed.
 
 Lemma interpretation_soundness : forall (s : formula) (m1 m2 : nat), interpretation s m1 -> interpretation s m2 -> m1 = m2.
 Proof.
-intros s m1 m2 Hm1 Hm2.
-inversion_clear Hm1 as [_ Hm1_2].
-inversion_clear Hm2 as [Hm2_1 _].
-have H : derivation calC (arr (to_dagger (represent_nat m1)) (to_dagger (represent_nat m2))).
+intros s m1 m2.
+inversion. inversion.
+have Hm1m2 : derivation calC (arr (to_dagger (represent_nat m1)) (to_dagger (represent_nat m2))).
 apply: intro_arr.
-set t := to_dagger (represent_nat m2) in Hm2_1 *.
-set u := to_dagger (represent_nat m1) in Hm1_2 *.
-set s' := (to_dagger s) in Hm2_1 Hm1_2 *.
+set t := to_dagger (represent_nat m2).
+set u := to_dagger (represent_nat m1).
+set s' := (to_dagger s).
 have Hu : derivation (u :: calC) u by derivation_rule.
 have Hus' : derivation (u :: calC) (arr u s').
 apply: (weakening (Γ := calC)) => //. intuition.
@@ -222,16 +423,15 @@ have Hs't : derivation (u :: calC) (arr s' t).
 apply: (weakening (Γ := calC)) => //. intuition.
 have Hs' : derivation (u :: calC) s' by derivation_rule.
 by derivation_rule.
-clear s Hm1_2 Hm2_1.
 suff : (1, m1) = (1, m2) by case.
-apply: derivation_atom_eq H; firstorder done.
+apply: derivation_atom_eq Hm1m2; firstorder done.
 Qed.
 
 
 Lemma interpretation_soundness_arr : forall (s1 s2 : formula) (m1 m2 : nat),
   derivation calC (arr (to_dagger s1) (to_dagger s2)) -> interpretation s1 m1 -> interpretation s2 m2 -> m1 = m2.
 Proof.
-intros * => ? [? ?] [? ?].
+intros * => ?. inversion. inversion.
 have ? : derivation calC (arr (to_dagger (represent_nat m1)) (to_dagger s2))
 by apply: derivation_arr_trans; eassumption.
 
@@ -243,14 +443,16 @@ apply: derivation_atom_eq => //; firstorder done.
 Qed.
 
 
-Lemma assert_sum : forall (s1 s2 s3 : formula) (m1 m2 m3 : nat) (ΓU ΓS ΓP : list formula),
+
+Lemma assert_sum : forall (s1 s2 s3 : formula) (m1 m2 m3 : nat) (ΓS : list formula),
   (forall {s : formula}, In s ΓS -> encodes_sum s) ->
   interpretation s1 m1 -> interpretation s2 m2 -> interpretation s3 m3 -> 
+  well_formed_formula (S s1 s2 s3) ->
   derivation (ΓS ++ [triangle; a_u; a_p]) (S s1 s2 s3) ->
   m1 + m2 = m3.
 Proof.
-intros until 3 => Hs1 Hs2 Hs3 HD.
-decompose_derivation.
+intros * => ? Hs1 Hs2 Hs3 ? HD.
+decompose_derivation. decompose_derivation. decompose_derivation. decompose_derivation.
 filter_context_chain => Hc.
 match goal with [ _ : In ?s ΓS |- _] => have : encodes_sum s by auto end.
 move => [s1' [s2' [s3' [?]]]].
@@ -258,7 +460,7 @@ subst; decompose_chain.
 decompose_Forall.
 do ? (generalize_ΓS).
 
-decompose_derivation.
+decompose_derivation. decompose_derivation. decompose_derivation. decompose_derivation. decompose_derivation. decompose_derivation.
 do ? (filter_context_chain).
 decompose_Forall.
 have Hs1s1' : derivation calC (arr (to_dagger s1') (to_dagger s1)).
@@ -279,17 +481,19 @@ have ? : m1' = m1 by apply: (interpretation_soundness_arr Hs1s1'); assumption.
 have ? : m2' = m2 by apply: (interpretation_soundness_arr Hs2s2'); assumption.
 have ? : m3' = m3 by apply: (interpretation_soundness_arr Hs3s3'); assumption.
 by subst.
+all: inspect_wff.
 Qed.
 
 
-Lemma assert_prod : forall (s1 s2 s3 : formula) (m1 m2 m3 : nat) (ΓU ΓS ΓP : list formula),
+Lemma assert_prod : forall (s1 s2 s3 : formula) (m1 m2 m3 : nat) (ΓP : list formula),
   (forall {s : formula}, In s ΓP -> encodes_prod s) ->
   interpretation s1 m1 -> interpretation s2 m2 -> interpretation s3 m3 -> 
+  well_formed_formula (P s1 s2 s3) ->
   derivation (ΓP ++ [triangle; a_u; a_s]) (P s1 s2 s3) ->
   m1 * m2 = m3.
 Proof.
-intros until 3 => Hs1 Hs2 Hs3 HD.
-decompose_derivation.
+intros * => ? Hs1 Hs2 Hs3 ? HD.
+decompose_derivation. decompose_derivation. decompose_derivation. decompose_derivation.
 filter_context_chain => Hc.
 match goal with [ _ : In ?s ΓP |- _] => have : encodes_prod s by auto end.
 move => [s1' [s2' [s3' [?]]]].
@@ -298,7 +502,7 @@ decompose_chain.
 decompose_Forall.
 do ? (generalize_ΓP).
 
-decompose_derivation.
+decompose_derivation. decompose_derivation. decompose_derivation. decompose_derivation. decompose_derivation. decompose_derivation.
 do ? (filter_context_chain).
 decompose_Forall.
 have Hs1s1' : derivation calC (arr (to_dagger s1') (to_dagger s1)).
@@ -319,6 +523,7 @@ have ? : m1' = m1 by apply: (interpretation_soundness_arr Hs1s1'); assumption.
 have ? : m2' = m2 by apply: (interpretation_soundness_arr Hs2s2'); assumption.
 have ? : m3' = m3 by apply: (interpretation_soundness_arr Hs3s3'); assumption.
 by subst.
+all: inspect_wff.
 Qed.
 
 
@@ -384,7 +589,7 @@ Qed.
 Ltac decompose_USP :=
   do [
     grab shape (normal_derivation _ _ (U _)); 
-    move /(generalize_ISP HS HP)/(get_interpretation HU)=> [? [? ?]] |
+    move /(generalize_ISP HS HP)/(get_interpretation HU); move /(_ ltac:(eassumption)) => [? [? ?]] |
     grab shape (normal_derivation _ _ (S _ _ _)); 
     let H := fresh in
       (move/(generalize_IUP HU HP) => H; (eapply assert_sum in H => //); try eassumption) |
@@ -444,8 +649,10 @@ intros * => HU HS HP ds ?.
 decompose_normal_derivation.
 grab In; case => [? | H_In].
 subst.
-grab chain. move /chain_intro_sum => [s1 [s2 [s3 [s4 [s5 ?]]]]]. subst.
-decompose_Forall. do ? decompose_USP.
+grab chain. move /chain_intro_sum => [s1 [s2 [s3 [s4 [s5 [? ?]]]]]]. subst.
+decompose_Forall. 
+
+do ? decompose_USP.
 grab normal_derivation; inversion.
 grab normal_derivation. move /(normal_weakening (Δ := (ΓI ds ++ ΓU ++ (S s1 s4 s5 :: ΓS) ++ ΓP))).
 move /(_ ltac:(clear; list_inclusion)).
@@ -461,7 +668,7 @@ lia.
 (*shown Gamma S inductive case*)
 (*NEXT: Gamma U inductive case*)
 case : H_In => [? | H_In]. 
-subst. grab chain. move /chain_intro_element => [s [? ?]]; subst.
+subst. grab chain. move /chain_intro_element => [s [? [? ?]]]; subst.
 decompose_Forall. do ? decompose_USP.
 match goal with [_ : interpretation s ?s_m |- _] => rename s_m into m end.
 
@@ -490,7 +697,7 @@ exists (Datatypes.S m); split; done + omega.
 case : H_In => [? | H_In].
 
 subst.
-grab chain. move /chain_intro_prod => [s1 [s2 [s3 [s4 [s5 ?]]]]]. subst.
+grab chain. move /chain_intro_prod => [s1 [s2 [s3 [s4 [s5 [? ?]]]]]]. subst.
 decompose_Forall. do ? decompose_USP.
 grab normal_derivation; inversion.
 grab normal_derivation. move /(normal_weakening (Δ := (ΓI ds ++ ΓU ++ ΓS ++ (P s1 s4 s5 :: ΓP)))).
@@ -508,9 +715,11 @@ case : H_In => [? | H_In].
 (*lettuce show s_x_d ds*)
 subst.
 grab chain.
+move /duplicate => [/(chain_param_wff (s_x_d_wff _)) ?].
 move /inspect_chain_diophantines => [f H_f].
-grab Forall; move /Forall_tl. grab @eq where tl. move => ->.
+grab Forall. move /Forall_tl. grab Forall. move /Forall_tl. grab @eq where tl. move => ->.
 move /Forall_flat_map. move => Hds.
+move /Forall_flat_map. move => Hds_wff.
 
 have : Forall (fun x => exists (m : nat), 
   interpretation (f x) (1+m)) (flat_map Diophantine.variables ds).
@@ -518,8 +727,10 @@ have : Forall (fun x => exists (m : nat),
 rewrite Forall_forall.
 move => x.
 rewrite in_flat_map. move => [d [? ?]].
-grab where (In d ds).
-grab where normal_derivation. move => H {H}/H.
+
+grab where normal_derivation. move /(_ _ ltac:(eassumption)).
+grab where (Forall well_formed_formula). move /(_ _ ltac:(eassumption)).
+grab (In d) => _. 
 revert dependent d. case; cbn; intros.
 1-3 : decompose_Forall.
 1-3 : do ? decompose_USP.
@@ -533,13 +744,15 @@ move => [g ?].
 
 constructor. exists g. apply Forall_forall => d Hdds.
 move : (Hdds). grab Forall. move /Forall_flat_map. move => H {H}/H.
-move : Hdds. grab where normal_derivation. move => H {H}/H.
+move : (Hdds). grab where normal_derivation. move => H {H}/H.
+move : Hdds. grab where (Forall well_formed_formula). move => H {H}/H.
 case d; cbn.
 1-3 : intros.
 1-3 : decompose_Forall.
 1-3 : do ? decompose_USP.
 1-3 : do ? egalize_interpretation.
 1-3 : by inspect_eqb.
+
 
 case /(@in_app_or formula): H_In => [|H_In].
 move /HU => [? [? ?]]; subst; decompose_chain.

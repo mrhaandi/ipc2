@@ -44,19 +44,37 @@ Definition calC : list formula := [a_u; a_s; a_p; triangle; bullet1; bullet2; bu
 Lemma calC_wff : Forall well_formed_formula calC.
 Proof. do ? constructor. Qed.
 
+(*
 Inductive interpretation (s : formula) (n : nat) : Prop :=
   | interpret :
+    lnd calC (Formula.arr (to_dagger s) (to_dagger (represent_nat n))) ->
+    lnd calC (Formula.arr (to_dagger (represent_nat n)) (to_dagger s)) -> interpretation s n.
+
+Lemma interpretation_of_representation : forall (n: nat), interpretation (represent_nat n) n.
+Proof.
+Admitted.
+
+Lemma interpretation_one : interpretation one 1.
+Proof.
+Admitted.
+*)
+
+Inductive interpretation (s : formula) (n : nat) : Prop :=
+  | interpret :
+    well_formed_formula s ->
     derivation calC (Formula.arr (to_dagger s) (to_dagger (represent_nat n))) ->
     derivation calC (Formula.arr (to_dagger (represent_nat n)) (to_dagger s)) -> interpretation s n.
 
 Lemma interpretation_of_representation : forall (n: nat), interpretation (represent_nat n) n.
 Proof.
-split; apply intro_arr; derivation_rule.
+move => ?. constructor.
+by constructor.
+all: apply intro_arr; derivation_rule.
 Qed.
 
 Lemma interpretation_one : interpretation one 1.
 Proof.
-split; apply intro_arr; derivation_rule.
+apply : interpretation_of_representation.
 Qed.
 
 Definition s_x_u : formula := let a := 1 in let b := 0 in
@@ -121,7 +139,6 @@ Definition represent_diophantine_repr (f : nat -> formula) (d : diophantine) : l
   | dio_sum a b c => [U (f a); U (f b); U (f c); S (f a) (f b) (f c)]
   | dio_prod a b c => [U (f a); U (f b); U (f c); P (f a) (f b) (f c)]
   end.
-
 
 Lemma lc_represent_diophantines : forall ds, lc (diophantine_variable_bound ds) (represent_diophantines ds).
 Proof.
@@ -313,6 +330,23 @@ Lemma inspect_chain_diophantines_one : forall (params : list formula) (ds : list
 Proof.
 eauto using inspect_chain_diophantines_aux_one, lc_represent_diophantines.
 Qed.
+
+Lemma lc_quantify_formula : forall n m s, lc (n+m) s -> lc m (quantify_formula n s).
+Proof.
+elim => //=.
+move => n IH m s ?. constructor. apply : IH.
+grab lc. congr lc. by lia.
+Qed.
+
+Lemma s_x_d_wff : forall ds, well_formed_formula (s_x_d ds).
+Proof.
+move => ?. rewrite /s_x_d.
+apply : lc_quantify_formula.
+have -> (n: nat) : n + 0 = n by lia.
+constructor. by do ? constructor.
+by apply : lc_represent_diophantines.
+Qed.
+
 
 (*HintDb containing instantiation simplification rules*)
 Create HintDb simplify_formula.
