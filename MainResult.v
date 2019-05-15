@@ -23,21 +23,22 @@ the reduction assumes normalization (cf. Derivations.v) of system F (corresponds
 and the Hilbert's epsilon combinator (cf. Coq.Logic.Epsilon)
 *)
 Theorem correctness : forall (ds : list diophantine), Diophantine.solvable ds <->
-  derivation (ΓI ds ++ [U one; P one one one]) triangle.
+  IIPC2.iipc2 (ΓI ds ++ [U one; P one one one]) triangle.
 Proof.
 move => ds.
 constructor.
-apply : completeness.
+move /completeness. move /F_adapter.derivation_to_iipc2. apply; inspect_wff.
 
-have : [U one; P one one one] = [U one] ++ [] ++ [P one one one] by done.
-move => ->.
-move /normal_derivation_completeness => [? HD].
 
-apply : soundness; try eassumption. 
+have -> : [U one; P one one one] = [U one] ++ [] ++ [P one one one] by done.
+move /F_adapter.iipc2_to_normal_derivation => [?].
+
+apply /soundness.
 all: move => s; case => //; move => <-.
 exists 1; auto.
 exists one, one, one; split; first auto.
 exists 1, 1, 1. auto using interpretation_one.
 Qed.
+
 
 Print Assumptions correctness.

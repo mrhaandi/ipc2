@@ -347,6 +347,13 @@ constructor. by do ? constructor.
 by apply : lc_represent_diophantines.
 Qed.
 
+Lemma ΓI_ds_wff : forall (ds : list diophantine), Forall well_formed_formula (ΓI ds).
+Proof.
+move => ?. rewrite /ΓI.
+do ? constructor.
+by apply s_x_d_wff.
+Qed.
+
 
 (*HintDb containing instantiation simplification rules*)
 Create HintDb simplify_formula.

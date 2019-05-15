@@ -212,6 +212,7 @@ Ltac inspect_wff :=
     | [H1 : forall (s : formula), In s ?Gamma → encodes_prod s, H2 : In (P ?s _ _) ?Gamma |- well_formed_formula ?s] => by apply : (wff_InGammaP1 H1 H2)
     | [H1 : forall (s : formula), In s ?Gamma → encodes_prod s, H2 : In (P _ ?s _) ?Gamma |- well_formed_formula ?s] => by apply : (wff_InGammaP2 H1 H2)
     | [H1 : forall (s : formula), In s ?Gamma → encodes_prod s, H2 : In (P _ _ ?s) ?Gamma |- well_formed_formula ?s] => by apply : (wff_InGammaP3 H1 H2)
+    | [|- Forall well_formed_formula (ΓI _)] => by apply ΓI_ds_wff
     | [|- Forall well_formed_formula calC] => by apply calC_wff
     | [|- Forall well_formed_formula []] => constructor
     | [|- Forall well_formed_formula (_ :: _)] => constructor
