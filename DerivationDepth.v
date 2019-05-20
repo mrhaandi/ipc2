@@ -1,13 +1,13 @@
 Require Import List.
+Import ListNotations.
 Require Import ListFacts.
 Require Import Arith.
-From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq.
 Require Import Formula.
 Require Import FormulaFacts.
-From LCAC Require Import Relations_ext seq_ext_base ssrnat_ext seq_ext F.
+
 Require Import UserTactics.
 
-
+From Coq Require Import ssreflect ssrbool.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
@@ -20,11 +20,11 @@ Require Import Psatz.
 (*iipc2 derivations containing derivation depth without regard for well-formedness*)
 Inductive derivation_depth : nat -> list formula -> formula -> Prop :=
   | dd_ax : forall (d : nat) (Gamma: list formula) (s: formula), In s Gamma -> derivation_depth d Gamma s
-  | dd_elim_arr : forall (d: nat) (Gamma: list formula) (s t: formula), derivation_depth d Gamma (Formula.arr s t) -> derivation_depth d Gamma s -> derivation_depth (d.+1) Gamma t
-  | dd_intro_arr : forall (d: nat) (Gamma: list formula) (s t : formula), derivation_depth d (s :: Gamma) t -> derivation_depth (d.+1) Gamma (Formula.arr s t)
-  | dd_elim_quant : forall (d: nat) (Gamma: list formula) (s t : formula), derivation_depth d Gamma (Formula.quant s) -> well_formed_formula t -> derivation_depth (d.+1) Gamma (instantiate t 0 s)
+  | dd_elim_arr : forall (d: nat) (Gamma: list formula) (s t: formula), derivation_depth d Gamma (Formula.arr s t) -> derivation_depth d Gamma s -> derivation_depth (1+d) Gamma t
+  | dd_intro_arr : forall (d: nat) (Gamma: list formula) (s t : formula), derivation_depth d (s :: Gamma) t -> derivation_depth (1+d) Gamma (Formula.arr s t)
+  | dd_elim_quant : forall (d: nat) (Gamma: list formula) (s t : formula), derivation_depth d Gamma (Formula.quant s) -> well_formed_formula t -> derivation_depth (1+d) Gamma (instantiate t 0 s)
   | dd_intro_quant : forall (d: nat) (Gamma: list formula) (s: formula), 
-      (forall (a: label), derivation_depth d Gamma (instantiate (atom a) 0 s)) -> derivation_depth (d.+1) Gamma (Formula.quant s).
+      (forall (a: label), derivation_depth d Gamma (instantiate (atom a) 0 s)) -> derivation_depth (1+d) Gamma (Formula.quant s).
 
 Lemma derivation_depth_relax : forall d d' Gamma t, derivation_depth d Gamma t -> d <= d' -> derivation_depth d' Gamma t.
 Proof.
@@ -32,8 +32,8 @@ elim.
 intros *. inversion => ?. by apply : dd_ax.
 
 move => d IH. intros *. inversion => ?.
-all: have -> : d' = (d'.-1).+1 by unfoldN; lia.
-all: have ? : d <= (d'.-1) by apply /leP; unfoldN; lia.
+all: have -> : d' = 1+(d'-1) by lia.
+all: have ? : d <= (d'-1) by lia.
 
 by apply : dd_ax.
 apply : dd_elim_arr; by eauto.
@@ -65,7 +65,7 @@ apply : dd_intro_quant => c.
 
 case : (Label.eq_dec c a) => ?.
 subst.
-have [c' ?] := exists_fresh ([:: Formula.atom a; Formula.atom b; s] ++ (map (substitute_label a b) Gamma)).
+have [c' ?] := exists_fresh ([Formula.atom a; Formula.atom b; s] ++ (map (substitute_label a b) Gamma)).
 do 3 (grab Forall; inversion).
 
 do 2 (grab shape (fresh_in c' (atom _)); inversion).
@@ -80,17 +80,17 @@ Module InstantiateAll.
 
 Fixpoint instantiate_all (n : nat) (t : formula) : formula :=
   match t with
-  | Formula.var m => if n <= m then Formula.atom (0,0) else t
+  | Formula.var m => if n <=? m then Formula.atom (0,0) else t
   | Formula.atom _ => t
   | Formula.arr s t => Formula.arr (instantiate_all n s) (instantiate_all n t)
-  | Formula.quant s => Formula.quant (instantiate_all (n.+1) s)
+  | Formula.quant s => Formula.quant (instantiate_all (1+n) s)
   end.
 
 
 Lemma lc_instantiate_all : forall t n, lc n t -> instantiate_all n t = t.
 Proof.
 elim => /=.
-intros *. inversion. by inspect_eqn.
+intros *. inversion. by inspect_eqb.
 by auto.
 move => *. grab lc. inversion. f_equal; by auto.
 move => *. grab lc. inversion. f_equal; by auto.
@@ -108,26 +108,30 @@ Lemma instantiate_all_lc : forall t n, lc n (instantiate_all n t).
 Proof.
 elim => /=.
 move => m n.
-have : (n <= m)%coq_nat \/ (m < n)%coq_nat by lia.
-case => ?; inspect_eqn; by constructor.
+have : (n <= m) \/ (m < n) by lia.
+case => ?; inspect_eqb; by constructor.
 move => *. by constructor.
 move => *. constructor; by auto.
 move => *. constructor; by auto.
 Qed.
 
 
-Lemma instantiate_all_instantiate : forall t, well_formed_formula t -> forall s n, (instantiate_all n (instantiate t n s)) = instantiate t n (instantiate_all n.+1 s).
+Lemma instantiate_all_instantiate : forall t, well_formed_formula t -> forall s n, (instantiate_all n (instantiate t n s)) = instantiate t n (instantiate_all (1+n) s).
 Proof.
 move => t ?.
-elim => /=.
+elim.
 
 move => m n.
-have : (n = m) \/ (n < m)%coq_nat \/ (n > m)%coq_nat by lia.
-(case; last case) => ?; inspect_eqb; inspect_eqn => /=; try inspect_eqb; try inspect_eqn => //.
-grab well_formed_formula. move /Lc.relax. move /(_ n ltac:(lia)) => ?. by rewrite lc_instantiate_all.
+have : (n = m) \/ (n < m) \/ (n > m) by lia.
+(case; last case) => ?.
+1-3: rewrite /instantiate -/instantiate /instantiate_all -/instantiate_all; do ? inspect_eqb.
+1-3: rewrite /instantiate -/instantiate /instantiate_all -/instantiate_all; do ? inspect_eqb => //.
+rewrite lc_instantiate_all => //.
+apply: Lc.relax; first eassumption. by lia.
 
 by auto.
 
+all: move => /=.
 move => *. f_equal; auto.
 move => *. f_equal; auto.
 Qed.

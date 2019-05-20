@@ -1577,7 +1577,6 @@ Qed.
 Section derivation_to_iipc2.
 
 Import InstantiateAll.
-Import DerivationIffDerivationDepth.
 
 Theorem derivation_to_iipc2 : forall (Gamma: list formula) (t: formula), derivation Gamma t -> Forall well_formed_formula Gamma -> well_formed_formula t -> iipc2 Gamma t.
 Proof.

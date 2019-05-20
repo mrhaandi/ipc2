@@ -5,8 +5,7 @@ Require Import ListFacts.
 Require Import Psatz.
 Require Import UserTactics.
 
-From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq.
-
+From Coq Require Import ssreflect.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.

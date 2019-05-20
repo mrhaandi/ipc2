@@ -8,7 +8,30 @@ Set Maximal Implicit Insertion.
 (*common header end*)
 
 Require Import Arith.
+Require Import PeanoNat.
 Require Import Psatz. (*lia : linear integer arithmetic, nia : non-linear integer arithmetic*)
+
+
+Lemma lebP m n : reflect (m <= n) (m <=? n).
+Proof.
+apply: (iffP idP); by move /Nat.leb_le.
+Qed.
+
+Lemma eqbP m n : reflect (m = n) (m =? n).
+Proof.
+apply: (iffP idP); by move /Nat.eqb_eq.
+Qed.
+
+Ltac inspect_eqb_aux t := try (
+  match goal with
+  | [ |- context [?x =? ?y]] => 
+    do [have -> : (x =? y) = false by apply /eqbP; t | have -> : (x =? y) = true by apply /eqbP; t]
+  | [ |- context [?x <=? ?y]] => 
+    do [have -> : (x <=? y) = false by apply /lebP; t |  have -> : (x <=? y) = true by apply /lebP; t]
+  end).
+
+Tactic Notation "inspect_eqb" := inspect_eqb_aux lia.
+
 
 From LCAC Require Import ssrnat_ext.
 From mathcomp Require Import eqtype ssrnat.
@@ -65,14 +88,14 @@ Tactic Notation "inversion" := let H := fresh "top" in
   subst; (*do ? (match goal with [E : ?t = ?u |- _] => is_var u; tryif is_var t then subst t else subst u end); (*propagate substitutions*)*)
   do ? (match goal with [E : unkeyed ?e |- _] => change e in E end). (*restore equalities*)
 
-
-(*smarter to autorewrite? what happens under binders?*)
+(*
 Ltac inspect_eqb := try (
   match goal with
   | [ |- context [?x =? ?y]] => 
     do [(have : x <> y by do [lia | nia]); move /Nat.eqb_neq => -> |
      (have : x = y by do [lia | nia]); move /Nat.eqb_eq => ->]
   end).
+*)
 
 (*bug: have behaves differently than suff*)
 (*decomposes top, a->b besomes b with seperate goal a*)

@@ -3,7 +3,7 @@ Require Import List.
 Import ListNotations.
 Require Import Omega.
 
-From Coq Require Import ssreflect.
+From Coq Require Import ssreflect ssrbool.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
@@ -635,6 +635,8 @@ Ltac egalize_interpretation :=
     tryif have ? : m1 = m2 by done then fail else have ? := interpretation_soundness H1 H2
   end.
 
+Ltac ia := do [lia | nia].
+
 Theorem soundness : forall (n : nat) (ΓU ΓS ΓP : list formula), 
   (forall (s : formula), In s ΓU -> represents_nat s) ->
   (forall (s : formula), In s ΓS -> encodes_sum s) ->
@@ -752,7 +754,7 @@ case d; cbn.
 1-3 : decompose_Forall.
 1-3 : do ? decompose_USP.
 1-3 : do ? egalize_interpretation.
-1-3 : by inspect_eqb.
+1-3 : by inspect_eqb_aux ia.
 
 
 case /(@in_app_or formula): H_In => [|H_In].

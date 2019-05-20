@@ -3,7 +3,7 @@ Require Import List.
 Import ListNotations.
 Require Import Omega.
 
-From Coq Require Import ssreflect.
+From Coq Require Import ssreflect ssrbool.
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.

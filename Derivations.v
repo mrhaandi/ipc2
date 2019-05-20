@@ -38,17 +38,6 @@ Inductive normal_derivation : nat → list formula → formula → Prop :=
 
 Definition lnd (Γ: list formula) (t: formula) := exists n, normal_derivation n Γ t.
 
-(*
-(*beta-normal eta-long iipc2 derivations without regard for well-formedness*)
-Inductive lnd : list formula → formula → Prop :=
-  | lnd_arr : ∀ (Γ: list formula) (s t: formula), lnd (s :: Γ) t → lnd Γ (Formula.arr s t)
-  | lnd_quant : ∀ (Γ: list formula) (s: formula), (forall (a: label), lnd Γ (instantiate (atom a) 0 s)) → lnd Γ (Formula.quant s)
-  | lnd_atom : ∀ (Γ: list formula) (a: label) (s: formula) (params: list formula), 
-      In s Γ → Formula.chain s a params → (Forall (lnd Γ) (params)) → lnd Γ (Formula.atom a).
-*)
-
-
-(*Axiom normal_derivation_completeness : forall (Γ: list formula) (s: formula), derivation Γ s → exists (n : nat), normal_derivation n Γ s.*)
 
 (*tries to solve derivation Γ s automatically*)
 Ltac derivation_rule := first
@@ -80,25 +69,22 @@ decompose_Forall.
 derivation_rule.
 Qed.
 
-Module DerivationIffDerivationDepth.
-
-From mathcomp Require Import ssreflect ssrbool ssrnat.
 
 Lemma derivation_exists_depth : forall (Gamma: list formula) (t: formula), derivation Gamma t -> exists (d: nat), derivation_depth d Gamma t.
 Proof.
 move => ? ?. elim => /=; clear.
 move => *. exists 0. by apply : dd_ax.
-intros *. move => _ [d1 ?] _ [d2 ?]. exists ((d1+d2).+1).
+intros *. move => _ [d1 ?] _ [d2 ?]. exists (1+(d1+d2)).
 apply : dd_elim_arr. 
-apply /derivation_depth_relax; try eassumption. apply /leP. unfoldN. by lia.
-apply /derivation_depth_relax; try eassumption. apply /leP. unfoldN. by lia.
-intros *. move => _ [d ?]. exists (d.+1). by apply : dd_intro_arr.
+apply /derivation_depth_relax; try eassumption. by lia.
+apply /derivation_depth_relax; try eassumption. by lia.
+intros *. move => _ [d ?]. exists (1+d). by apply : dd_intro_arr.
 intros *. move => _ [d Hd] H. elim : H d Hd.
 by eauto.
 clear. move => s t u *.
 grab derivation_depth. move /dd_elim_quant. move /(_ _ ltac:(eassumption)). by eauto.
 move => Gamma t _. have [a /Forall_cons_iff [? ?]] := exists_fresh (t :: Gamma).
-move /(_ a) => [d ?]. exists (d.+1). apply : dd_intro_quant. move => b.
+move /(_ a) => [d ?]. exists (1+d). apply : dd_intro_quant. move => b.
 grab derivation_depth. move /(substitute_label_derivation_depth a b).
 congr derivation_depth.
 revert dependent Gamma.
@@ -108,6 +94,7 @@ by rewrite -substitute_fresh_label.
 by auto.
 by apply : rename_instantiation.
 Qed.
+
 
 Lemma derivation_hide_depth : forall (d: nat) (Gamma: list formula) (t: formula), derivation_depth d Gamma t -> derivation Gamma t.
 Proof.
@@ -120,9 +107,6 @@ apply : contains_trans; [by eassumption | by constructor].
 move => *. by apply : intro_quant.
 Qed.
 
-End DerivationIffDerivationDepth.
-
-Import DerivationIffDerivationDepth.
 
 Lemma relax_depth_normal_derivation : forall (n m : nat) (Γ : list formula) (s : formula), 
   normal_derivation n Γ s -> (n <= m) -> normal_derivation m Γ s.
@@ -206,10 +190,6 @@ Ltac decompose_lc :=
     end
   end).
 
-Tactic Notation "grab" "where" constr(p) := 
-  lazymatch goal with
-  | [H : context[p] |- _] => move : H
-  end.
 
 Lemma substitute_normal_derivation : forall (n : nat) (s : formula) (Γ : list formula) (a b : label), 
   normal_derivation n Γ s -> normal_derivation n (map (substitute_label a b) Γ) (substitute_label a b s).
@@ -272,17 +252,7 @@ rewrite rename_instantiation; first last. done.
 rewrite <- map_substitute_fresh_label.
 apply. done.
 Qed.
-(*
-Lemma substitute_derivation_bindable : forall (s : formula) (Γ : list formula) (a b : label), 
-  Forall (fresh_in a) Γ -> derivation Γ s -> derivation Γ (substitute_label a b s).
-Proof.
-intros.
-have : Γ = map (substitute_label a b) Γ by apply map_substitute_fresh_label.
-move => ->.
-grab derivation; move /normal_derivation_completeness => [? ?].
-eauto using normal_derivation_soundness, substitute_normal_derivation.
-Qed.
-*)
+
 
 (*the usual presentation of intro_quant*)
 Theorem intro_quant_fresh : ∀ (s: formula) (Γ : list formula) (a : label), 
@@ -295,7 +265,6 @@ apply : (@derivation_hide_depth (1+d)).
 apply : dd_intro_quant.
 move => b. grab derivation_depth. move /(@substitute_label_derivation_depth _ a b).
 rewrite rename_instantiation //.
-have -> : @seq.map = map by reflexivity.
 by rewrite -map_substitute_fresh_label //.
 Qed.
 
