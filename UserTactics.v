@@ -33,11 +33,6 @@ Ltac inspect_eqb_aux t := try (
 Tactic Notation "inspect_eqb" := inspect_eqb_aux lia.
 
 
-From LCAC Require Import ssrnat_ext.
-From mathcomp Require Import eqtype ssrnat.
-
-Ltac unfoldN := do ? arith_hypo_ssrnat2coqnat; do ?unfold addn, subn, muln, addn_rec, subn_rec, muln_rec, leq, Equality.sort, nat_eqType in *.
-
 Ltac decompose_or tactic :=
   match goal with
   | [ |- _ \/ _ -> _] => case; [tactic | decompose_or tactic]
@@ -144,14 +139,3 @@ Ltac do_last_tac n t :=
 Tactic Notation "do_first" constr(n) tactic(t) := do_first_tac n t.
 Tactic Notation "do_last" constr(n) tactic(t) := do_last_tac n t.
 
-
-(*tries to simplify nat comparisons*)
-Ltac inspect_eqn :=
-  match goal with
-  | [ |- context [?x == ?y]] => 
-    do [(have : (x == y) = false by apply /eqP; unfoldN; lia); move => -> |
-     (have : (x == y) = true by apply /eqP; unfoldN; lia); move => ->]
-  | [ |- context [?x <= ?y]] => 
-    do [(have : (x <= y) = false by apply /eqP; unfoldN; lia); move => -> |
-     (have : (x <= y) = true by apply /eqP; unfoldN; lia); move => ->]
-  end.

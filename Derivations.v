@@ -248,7 +248,7 @@ Proof.
 move => s Γ a n H *.
 constructor => b.
 grab normal_derivation. move /(substitute_normal_derivation a b).
-rewrite rename_instantiation; first last. done.
+rewrite rename_instantiation. done.
 rewrite <- map_substitute_fresh_label.
 apply. done.
 Qed.

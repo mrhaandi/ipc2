@@ -155,13 +155,13 @@ by auto.
 apply : dd_intro_arr.
 rewrite -map_cons. by eauto.
 
-rewrite instantiate_all_instantiate; last done.
+rewrite instantiate_all_instantiate. done.
 apply : dd_elim_quant; eauto.
 have -> : (quant (instantiate_all 1 s)) = instantiate_all 0 (quant s) by reflexivity.
 by eauto.
 
 apply : dd_intro_quant => a.
-rewrite -instantiate_all_instantiate; last by constructor.
+rewrite -instantiate_all_instantiate. by constructor.
 by eauto.
 Qed.
 

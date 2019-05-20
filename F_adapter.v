@@ -17,6 +17,18 @@ Unset Printing Implicit Defensive.
 Require Import Wf_nat.
 Require Import Psatz.
 
+Ltac unfoldN := do ? arith_hypo_ssrnat2coqnat; do ?unfold addn, subn, muln, addn_rec, subn_rec, muln_rec, leq, Equality.sort, nat_eqType in *.
+
+(*tries to simplify nat comparisons*)
+Ltac inspect_eqn :=
+  match goal with
+  | [ |- context [?x == ?y]] => 
+    do [(have : (x == y) = false by apply /eqP; unfoldN; lia); move => -> |
+     (have : (x == y) = true by apply /eqP; unfoldN; lia); move => ->]
+  | [ |- context [?x <= ?y]] => 
+    do [(have : (x <= y) = false by apply /eqP; unfoldN; lia); move => -> |
+     (have : (x <= y) = true by apply /eqP; unfoldN; lia); move => ->]
+  end.
 
 Inductive normal_form : term -> Prop :=
   | nf_hf : forall M, head_form M -> normal_form M
