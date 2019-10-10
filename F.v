@@ -895,6 +895,7 @@ Qed.
 
 End subject_reduction_proof.
 
+(*
 Module strong_normalization_proof_typefree.
 
 Section CRs.
@@ -1107,6 +1108,8 @@ by apply subst_reduction1, substtyp_reduction1.
 Qed.
 
 End strong_normalization_proof_typefree.
+*)
+
 (*
 Module strong_normalization_proof_typed.
 

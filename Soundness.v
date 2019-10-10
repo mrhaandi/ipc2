@@ -746,9 +746,9 @@ move /finite_functional_choice.
 move => [g ?].
 
 constructor. exists g. apply Forall_forall => d Hdds.
-move : (Hdds). grab Forall. move /Forall_flat_map. move => H {H}/H.
-move : (Hdds). grab where normal_derivation. move => H {H}/H.
-move : Hdds. grab where (Forall well_formed_formula). move => H {H}/H.
+move : (Hdds). grab Forall. move /Forall_flat_map. move => H {}/H.
+move : (Hdds). grab where normal_derivation. move => H {}/H.
+move : Hdds. grab where (Forall well_formed_formula). move => H {}/H.
 case d; cbn.
 1-3 : intros.
 1-3 : decompose_Forall.

@@ -464,8 +464,8 @@ move /(_ _ (instantiate_diophantine_representation g ds)).
 move /elim_arr; nip; first derivation_rule.
 move : (ΓI ds) => ΓI_ds.
 have : forall s, In s (map (represent_diophantine_eval g) ds) -> In s Γ' by auto.
-move : (Γ') => {Γ'} Γ'.
-(*induction not entirely clear, Gamma' changes?*)
+move : Γ' => Γ'.
+
 revert dependent ds.
 elim; first auto.
 case.

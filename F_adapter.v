@@ -1575,7 +1575,7 @@ Proof.
 intros *. have [labeling ?] := @exists_bijective_labeling.
 move /duplicate => [/iipc2_wff [? ?]].
 move /iipc2_to_f. move /(_ labeling ltac:(apply /bij_inj => //)) => [?].
-case /duplicate. move /strong_normalization_proof_typefree.typed_term_is_snorm.
+case /duplicate. move /strong_normalization_proof_kripke.typed_term_is_snorm.
 move /sn_to_not_reducible => [N [?]].
 apply : swap. move /subject_reduction. move /(_ _ ltac:(eassumption)) => D.
 move /not_reducible_to_nf. move /(_ _ _ D).
